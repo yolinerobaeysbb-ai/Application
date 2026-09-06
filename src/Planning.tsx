@@ -1,55 +1,36 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, Dumbbell, LoaderCircle, Trash2, Utensils } from 'lucide-react'
+import { BookOpen, Check, Dumbbell, LoaderCircle, ShoppingBasket, Trash2, Utensils } from 'lucide-react'
 import { supabase } from './lib/supabase'
 
 const languages = ['Allemand', 'Coréen', 'Espagnol', 'Italien', 'Japonais', 'Néerlandais', 'Thaïlandais']
+const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 type Category = 'language' | 'sport' | 'food'
-type Item = { id: string; category: Category; language: string | null; title: string; description: string; duration_minutes: number | null }
-const categories: { key: Category; label: string; className: string; icon: typeof BookOpen }[] = [
-  { key: 'language', label: 'Langues', className: 'language-card', icon: BookOpen },
-  { key: 'sport', label: 'Sport / muscu', className: 'sport-card', icon: Dumbbell },
-  { key: 'food', label: 'Nourriture', className: 'food-card', icon: Utensils },
-]
+type Item = { id: string; category: Category; language: string | null; title: string; description: string; duration_minutes: number | null; day_of_week: number }
+type ShoppingItem = { id: string; name: string; quantity: number | null; unit: string | null; category: string | null; checked: boolean }
+const categories: { key: Category; label: string; className: string; icon: typeof BookOpen }[] = [{ key: 'language', label: 'Langues', className: 'language-card', icon: BookOpen }, { key: 'sport', label: 'Sport / muscu', className: 'sport-card', icon: Dumbbell }, { key: 'food', label: 'Nourriture', className: 'food-card', icon: Utensils }]
 
-type Props = { week: number; isAdmin: boolean }
-
-export default function Planning({ week, isAdmin }: Props) {
+type Props = { week: number; setWeek: (week: number) => void; isAdmin: boolean }
+export default function Planning({ week, setWeek, isAdmin }: Props) {
   const [items, setItems] = useState<Item[]>([])
+  const [shopping, setShopping] = useState<ShoppingItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ category: 'language' as Category, language: languages[0], title: '', description: '', duration: '' })
-
-  async function loadItems() {
-    setLoading(true)
-    setError('')
-    const { data, error: queryError } = await supabase.from('content_items').select('id, category, language, title, description, duration_minutes').eq('week', week).order('category').order('title')
-    if (queryError) setError('Impossible de charger le planning de cette semaine.')
-    setItems((data ?? []) as Item[])
+  const [form, setForm] = useState({ category: 'language' as Category, language: languages[0], title: '', description: '', duration: '', day: '1' })
+  async function loadPlanning() {
+    setLoading(true); setError('')
+    const schedule = await supabase.from('weekly_schedule_items').select('id, category, title, description, duration_minutes, day_of_week').eq('week_number', week).order('day_of_week')
+    if (schedule.error) {
+      const fallback = await supabase.from('content_items').select('id, category, language, title, description, duration_minutes').eq('week', week).order('category').order('title')
+      setItems((fallback.data ?? []).map((item) => ({ ...item, day_of_week: 1 })) as Item[])
+      if (fallback.error) setError('Impossible de charger le planning.')
+    } else setItems((schedule.data ?? []) as Item[])
+    const groceries = await supabase.from('shopping_items').select('id, name, quantity, unit, category, shopping_item_checks(checked)').eq('week_number', week).order('category').order('name')
+    if (!groceries.error) setShopping((groceries.data ?? []).map((item: { id: string; name: string; quantity: number | null; unit: string | null; category: string | null; shopping_item_checks: { checked: boolean }[] }) => ({ ...item, checked: item.shopping_item_checks?.[0]?.checked ?? false })))
     setLoading(false)
   }
-
-  useEffect(() => { void loadItems() }, [week])
-
-  async function addContent(event: React.FormEvent) {
-    event.preventDefault()
-    setError('')
-    const { error: insertError } = await supabase.from('content_items').insert({ category: form.category, language: form.category === 'language' ? form.language : null, week, title: form.title.trim(), description: form.description.trim(), duration_minutes: form.duration ? Number(form.duration) : null })
-    if (insertError) { setError('Impossible d’ajouter ce contenu.'); return }
-    setForm({ ...form, title: '', description: '', duration: '' })
-    await loadItems()
-  }
-
-  async function removeContent(id: string) {
-    const { error: deleteError } = await supabase.from('content_items').delete().eq('id', id)
-    if (deleteError) { setError('Impossible de supprimer ce contenu.'); return }
-    setItems((current) => current.filter((item) => item.id !== id))
-  }
-
-  return <section className="content-grid">
-    <div className="section-intro"><p className="eyebrow">Semaine {week.toString().padStart(2, '0')} / 16</p><h2>Le plan du jour, sans bruit.</h2><p className="muted">Trois repères pour avancer cette semaine : apprendre, bouger et bien manger.</p></div>
-    {loading && <p className="loading-state"><LoaderCircle size={17} className="spin" /> Chargement du planning...</p>}
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="feature-grid">{categories.map(({ key, label, className, icon: Icon }) => <article className={`feature-card ${className}`} key={key}><div className="card-icon"><Icon /></div><div><p className="card-kicker">{label}</p>{items.filter((item) => item.category === key).length ? items.filter((item) => item.category === key).map((item) => <div className="content-entry" key={item.id}><h3>{item.title}</h3><p>{item.description || 'Contenu à découvrir.'}{item.duration_minutes ? ` · ${item.duration_minutes} min` : ''}</p>{item.language && <span className="content-language">{item.language}</span>}{isAdmin && <button className="delete-button" type="button" onClick={() => void removeContent(item.id)} aria-label={`Supprimer ${item.title}`}><Trash2 size={14} /></button>}</div>) : <p>Aucun contenu prévu.</p>}</div></article>)}</div>
-    {isAdmin && <form className="admin-editor" onSubmit={addContent}><p className="card-kicker">Administration · semaine {week}</p><div className="editor-fields"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })}><option value="language">Langue</option><option value="sport">Sport</option><option value="food">Nourriture</option></select>{form.category === 'language' && <select value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })}>{languages.map((language) => <option key={language}>{language}</option>)}</select>}<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Titre" required /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Résumé" /><input type="number" min="1" value={form.duration} onChange={(event) => setForm({ ...form, duration: event.target.value })} placeholder="Durée (min)" /></div><button className="primary-button">Ajouter à la semaine {week}</button></form>}
-  </section>
+  useEffect(() => { void loadPlanning() }, [week])
+  async function toggleShopping(item: ShoppingItem) { const checked = !item.checked; setShopping((current) => current.map((entry) => entry.id === item.id ? { ...entry, checked } : entry)); const userId = (await supabase.auth.getUser()).data.user?.id; if (userId) await supabase.from('shopping_item_checks').upsert({ shopping_item_id: item.id, user_id: userId, checked }, { onConflict: 'shopping_item_id,user_id' }) }
+  async function addContent(event: React.FormEvent) { event.preventDefault(); const { error: insertError } = await supabase.from('weekly_schedule_items').insert({ category: form.category, week_number: week, day_of_week: Number(form.day), title: form.title.trim(), description: form.description.trim(), duration_minutes: form.duration ? Number(form.duration) : null }); if (insertError) { setError('Impossible d’ajouter cette activité.'); return }; setForm({ ...form, title: '', description: '', duration: '' }); await loadPlanning() }
+  async function removeContent(id: string) { await supabase.from('weekly_schedule_items').delete().eq('id', id); setItems((current) => current.filter((item) => item.id !== id)) }
+  return <section className="content-grid"><div className="planning-heading"><div className="section-intro"><p className="eyebrow">Votre planning</p><h2>Semaine {week.toString().padStart(2, '0')} / 16</h2><p className="muted">Une vue quotidienne pour apprendre, bouger et préparer votre semaine.</p></div><label className="planning-week-select"><span>Semaine active</span><select value={week} onChange={(event) => setWeek(Number(event.target.value))}>{Array.from({ length: 16 }, (_, index) => <option key={index + 1} value={index + 1}>Semaine {index + 1}</option>)}</select></label></div>{loading && <p className="loading-state"><LoaderCircle size={17} className="spin" /> Chargement du planning...</p>}{error && <p className="form-error" role="alert">{error}</p>}<div className="daily-planning">{days.map((day, index) => <article className="day-card" key={day}><div className="day-heading"><span>0{index + 1}</span><h3>{day}</h3></div>{items.filter((item) => item.day_of_week === index + 1).length ? items.filter((item) => item.day_of_week === index + 1).map((item) => <div className="day-activity" key={item.id}><strong>{item.title}</strong><small>{item.category === 'language' ? 'Langue' : item.category === 'sport' ? 'Sport' : 'Nutrition'}{item.duration_minutes ? ` · ${item.duration_minutes} min` : ''}</small>{item.description && <p>{item.description}</p>}{isAdmin && <button className="delete-button" type="button" onClick={() => void removeContent(item.id)} aria-label={`Supprimer ${item.title}`}><Trash2 size={13} /></button>}</div>) : <p className="day-empty">Repos ou activité libre</p>}</article>)}</div><div className="feature-grid">{categories.map(({ key, label, className, icon: Icon }) => <article className={`feature-card ${className}`} key={key}><div className="card-icon"><Icon /></div><div><p className="card-kicker">{label}</p>{items.filter((item) => item.category === key).length ? <p>{items.filter((item) => item.category === key).length} activité{items.filter((item) => item.category === key).length > 1 ? 's' : ''} planifiée{items.filter((item) => item.category === key).length > 1 ? 's' : ''} cette semaine.</p> : <p>Aucun contenu prévu.</p>}</div></article>)}</div><article className="shopping-card"><div className="shopping-heading"><div><p className="card-kicker">Nutrition</p><h3>Liste de courses</h3><p className="muted">Les ingrédients de la semaine, à cocher au fil des achats.</p></div><ShoppingBasket size={23} /></div>{shopping.length ? <div className="shopping-list">{shopping.map((item) => <label className={`shopping-item ${item.checked ? 'checked' : ''}`} key={item.id}><input type="checkbox" checked={item.checked} onChange={() => void toggleShopping(item)} /><span className="shopping-check"><Check size={13} /></span><span>{item.name}<small>{item.quantity ? `${item.quantity} ${item.unit ?? ''}` : item.category ?? 'À prévoir'}</small></span></label>)}</div> : <p className="muted">La liste de courses sera disponible lorsque le planning nutrition sera renseigné.</p>}</article>{isAdmin && <form className="admin-editor" onSubmit={addContent}><p className="card-kicker">Administration · ajouter au calendrier</p><div className="editor-fields"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })}><option value="language">Langue</option><option value="sport">Sport</option><option value="food">Nourriture</option></select><select value={form.day} onChange={(event) => setForm({ ...form, day: event.target.value })}>{days.map((day, index) => <option value={index + 1} key={day}>{day}</option>)}</select>{form.category === 'language' && <select value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })}>{languages.map((language) => <option key={language}>{language}</option>)}</select>}<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Activité" required /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Détails" /><input type="number" min="1" value={form.duration} onChange={(event) => setForm({ ...form, duration: event.target.value })} placeholder="Durée (min)" /></div><button className="primary-button">Ajouter à la semaine {week}</button></form>}</section>
 }

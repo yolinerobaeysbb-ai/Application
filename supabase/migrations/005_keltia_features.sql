@@ -227,6 +227,33 @@ alter table public.nutrition_progress enable row level security;
 alter table public.language_placement_tests enable row level security;
 alter table public.admin_notifications enable row level security;
 
+drop policy if exists "Authenticated members can read weekly schedule" on public.weekly_schedule_items;
+drop policy if exists "Admins can manage weekly schedule" on public.weekly_schedule_items;
+drop policy if exists "Authenticated members can read shopping items" on public.shopping_items;
+drop policy if exists "Admins can manage shopping items" on public.shopping_items;
+drop policy if exists "Members can read their shopping checks" on public.shopping_item_checks;
+drop policy if exists "Members can create their shopping checks" on public.shopping_item_checks;
+drop policy if exists "Members can update their shopping checks" on public.shopping_item_checks;
+drop policy if exists "Members can delete their shopping checks" on public.shopping_item_checks;
+drop policy if exists "Authenticated members can read language courses" on public.language_courses;
+drop policy if exists "Admins can manage language courses" on public.language_courses;
+drop policy if exists "Authenticated members can read language exercises" on public.language_exercises;
+drop policy if exists "Admins can manage language exercises" on public.language_exercises;
+drop policy if exists "Members can read their sport progress" on public.sport_progress;
+drop policy if exists "Members can create their sport progress" on public.sport_progress;
+drop policy if exists "Members can update their sport progress" on public.sport_progress;
+drop policy if exists "Members can delete their sport progress" on public.sport_progress;
+drop policy if exists "Members can read their nutrition progress" on public.nutrition_progress;
+drop policy if exists "Members can create their nutrition progress" on public.nutrition_progress;
+drop policy if exists "Members can update their nutrition progress" on public.nutrition_progress;
+drop policy if exists "Members can delete their nutrition progress" on public.nutrition_progress;
+drop policy if exists "Members can read their placement tests" on public.language_placement_tests;
+drop policy if exists "Members can create their placement tests" on public.language_placement_tests;
+drop policy if exists "Members can update their placement tests" on public.language_placement_tests;
+drop policy if exists "Admins can read notifications" on public.admin_notifications;
+drop policy if exists "Admins can update notifications" on public.admin_notifications;
+drop policy if exists "Admins can delete notifications" on public.admin_notifications;
+
 create policy "Authenticated members can read weekly schedule"
 on public.weekly_schedule_items for select to authenticated using (true);
 create policy "Admins can manage weekly schedule"
