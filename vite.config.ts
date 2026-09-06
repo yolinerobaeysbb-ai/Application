@@ -9,16 +9,19 @@ export default defineConfig({
   },
   plugins: [react(), VitePWA({
     registerType: 'autoUpdate',
-    includeAssets: ['**/*.{pdf,xlsx}'],
+    includeAssets: ['**/*.{pdf,xlsx,png}'],
     manifest: {
-      name: 'Phoenix - Parcours personnel',
-      short_name: 'Phoenix',
-      description: 'Parcours privé de langues, sport et nutrition sur 16 semaines.',
-      theme_color: '#254e45',
-      background_color: '#f1f1ec',
+      name: 'Keltia - Espace membre',
+      short_name: 'Keltia',
+      description: 'Espace privé de langues, sport et nutrition.',
+      theme_color: '#1f4d43',
+      background_color: '#f6f4ef',
       display: 'standalone',
       lang: 'fr',
-      icons: [],
+      icons: [
+        { src: '/keltia-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+        { src: '/keltia-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      ],
     },
   })],
 })
