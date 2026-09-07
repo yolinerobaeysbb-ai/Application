@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Activity, BookOpen, Dumbbell, FileText, FolderOpen, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, Trash2, UserRound, Utensils, X } from 'lucide-react'
+import { Activity, BookOpen, Dumbbell, FileText, FolderOpen, Languages, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, Trash2, UserRound, Utensils, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import PlanningV2 from './Planning'
 import SuggestionsV2 from './Suggestions'
 import NotificationBell from './NotificationBell'
 import ProgressDashboard from './ProgressDashboard'
 import CourseHub from './CourseHub'
+import Supports from './Supports'
+import LanguageRecap from './LanguageRecap'
 import './App.css'
 
 const ADMIN_EMAIL = 'yoline.robaeysbb@gmail.com'
 const languages = ['Allemand', 'Coréen', 'Espagnol', 'Italien', 'Japonais', 'Néerlandais', 'Thaïlandais']
-type Tab = 'planning' | 'courses' | 'resources' | 'progress' | 'suggestions' | 'settings'
+type Tab = 'planning' | 'courses' | 'recap' | 'resources' | 'progress' | 'suggestions' | 'settings'
 type ContentCategory = 'language' | 'sport' | 'food'
 type ContentItem = { id: string; category: ContentCategory; language: string | null; week: number; title: string; description: string; body: string; file_url: string | null; duration_minutes: number | null }
 type Suggestion = { id: string; category: string; message: string; status: 'pending' | 'treated' | 'deleted'; created_at: string; profiles?: { email: string }[] | null }
@@ -72,7 +74,7 @@ function App() {
     {sidebarOpen && <button className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" />}
     <div className="app-main"><header className="app-header"><button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu size={21} /></button><div><p className="header-kicker">Espace membre</p><strong>Keltia</strong></div><div className="header-actions">{isAdmin && <NotificationBell />}<button className="avatar-button" onClick={() => navigate('settings')} aria-label="Ouvrir les paramètres"><UserRound size={18} /></button></div></header>
       <main className="page-content"><section className="welcome-row"><div><p className="eyebrow">Bonjour{session.user.email ? `, ${session.user.email.split('@')[0]}` : ''}</p><h1>Votre espace pour progresser.</h1><p className="muted">Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>
-        {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={isAdmin} onOpenActivity={openActivity} />}{tab === 'courses' && <CourseHub activity={selectedActivity} onBack={() => navigate('planning')} />}{tab === 'resources' && <Resources />}{tab === 'progress' && <ProgressDashboard userId={session.user.id} />}{tab === 'suggestions' && <SuggestionsV2 isAdmin={isAdmin} userId={session.user.id} />}{tab === 'settings' && <SettingsPanel email={session.user.email ?? ''} isAdmin={isAdmin} darkMode={darkMode} onDarkModeChange={setDarkMode} onLogout={() => void handleLogout()} />}{isAdmin && tab !== 'settings' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
+        {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={isAdmin} onOpenActivity={openActivity} />}{tab === 'courses' && <CourseHub activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('planning')} />}{tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}{tab === 'resources' && <Supports />}{tab === 'progress' && <ProgressDashboard userId={session.user.id} />}{tab === 'suggestions' && <SuggestionsV2 isAdmin={isAdmin} userId={session.user.id} />}{tab === 'settings' && <SettingsPanel email={session.user.email ?? ''} isAdmin={isAdmin} darkMode={darkMode} onDarkModeChange={setDarkMode} onLogout={() => void handleLogout()} />}{isAdmin && tab !== 'settings' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
       </main><footer>KELTIA <span>·</span> espace privé membre</footer></div>
   </div>
 }
@@ -81,9 +83,10 @@ function KeltiaMark({ large = false }: { large?: boolean }) { return <div classN
 function Sidebar({ activeTab, isAdmin, email, open, onNavigate, onClose }: { activeTab: Tab; isAdmin: boolean; email: string; open: boolean; onNavigate: (tab: Tab) => void; onClose: () => void }) {
   const items: { tab: Tab; label: string; caption: string; icon: React.ReactNode }[] = [
     { tab: 'planning', label: 'Tableau de bord', caption: 'Plannings', icon: <LayoutDashboard size={18} /> },
-    { tab: 'courses', label: 'Cours & hub', caption: 'Langues et apprentissage', icon: <BookOpen size={18} /> },
+    { tab: 'courses', label: 'Plan & Plate', caption: 'Cours et modules', icon: <BookOpen size={18} /> },
+    { tab: 'recap', label: 'Récap', caption: 'Révisions par langue', icon: <Languages size={18} /> },
+    { tab: 'progress', label: 'Progress', caption: 'Vos progrès', icon: <Activity size={18} /> },
     { tab: 'resources', label: 'Supports', caption: 'Fichiers et documents', icon: <FolderOpen size={18} /> },
-    { tab: 'progress', label: 'Suivi', caption: 'Vos progrès', icon: <Activity size={18} /> },
     { tab: 'suggestions', label: 'Idées', caption: 'Faire évoluer Keltia', icon: <MessageSquarePlus size={18} /> },
   ]
   return <aside className={`sidebar ${open ? 'is-open' : ''}`}><div className="sidebar-top"><KeltiaMark /><button className="sidebar-close" onClick={onClose} aria-label="Fermer le menu"><X size={19} /></button></div><div className="sidebar-label">Navigation</div><nav className="sidebar-nav" aria-label="Navigation principale">{items.map((item, index) => <button className={`sidebar-link ${activeTab === item.tab && (index !== 2 || activeTab === 'resources') ? 'active' : ''}`} key={`${item.label}-${index}`} onClick={() => onNavigate(item.tab)}>{item.icon}<span><strong>{item.label}</strong><small>{item.caption}</small></span></button>)}</nav><div className="sidebar-bottom"><button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => onNavigate('settings')}><Settings size={18} /><span><strong>Paramètres</strong><small>Compte et préférences</small></span></button><div className="sidebar-user"><span className="user-avatar">{email.slice(0, 1).toUpperCase() || 'K'}</span><span><strong>{email.split('@')[0] || 'Membre'}</strong><small>{isAdmin ? 'Administrateur' : 'Membre'}</small></span></div></div></aside>
@@ -111,5 +114,6 @@ function Suggestions({ isAdmin, userId }: { isAdmin: boolean; userId: string }) 
 void Planning
 void Progress
 void Suggestions
+void Resources
 
 export default App
