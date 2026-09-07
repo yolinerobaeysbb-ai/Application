@@ -7,12 +7,13 @@ const languages = ['Allemand', 'Coréen', 'Espagnol', 'Italien', 'Japonais', 'N�
 type SectionType = 'alphabet' | 'vocabulary' | 'rule' | 'declension' | 'conjugation'
 type SectionResource = { type: string; title: string; url: string }
 type RecapTable = { headers: string[]; rows: string[][] }
-type Section = { id: string; language: string; section_type: SectionType; title: string; content: string; data: Record<string, unknown> & { web_resources?: SectionResource[]; local_documents?: SectionResource[]; table?: RecapTable }; position: number }
+type RecapBlock = { title: string; content: string }
+type Section = { id: string; language: string; section_type: SectionType; title: string; content: string; data: Record<string, unknown> & { web_resources?: SectionResource[]; local_documents?: SectionResource[]; table?: RecapTable; blocks?: RecapBlock[] }; position: number }
 type Props = { selectedLanguage?: string }
-type SectionForm = { section_type: SectionType; title: string; content: string; position: number; tableJson: string }
+type SectionForm = { section_type: SectionType; title: string; content: string; position: number; tableJson: string; blocksJson: string }
 const labels: Record<SectionType, string> = { alphabet: 'Alphabet', vocabulary: 'Vocabulaire', rule: 'Règles', declension: 'Déclinaisons', conjugation: 'Conjugaisons' }
 
-const emptyForm = (position: number): SectionForm => ({ section_type: 'vocabulary', title: '', content: '', position, tableJson: '' })
+const emptyForm = (position: number): SectionForm => ({ section_type: 'vocabulary', title: '', content: '', position, tableJson: '', blocksJson: '' })
 
 export default function LanguageRecap({ selectedLanguage }: Props) {
   const [language, setLanguage] = useState(selectedLanguage ?? languages[0])
@@ -65,6 +66,7 @@ export default function LanguageRecap({ selectedLanguage }: Props) {
       content: section.content,
       position: section.position,
       tableJson: section.data?.table ? JSON.stringify(section.data.table, null, 2) : '',
+      blocksJson: Array.isArray(section.data?.blocks) ? JSON.stringify(section.data.blocks, null, 2) : '',
     })
   }
 
@@ -75,16 +77,29 @@ export default function LanguageRecap({ selectedLanguage }: Props) {
       return
     }
 
-    let data: Record<string, unknown> = {}
+    const data: Record<string, unknown> = {}
     if (form.tableJson.trim()) {
       try {
         const parsed = JSON.parse(form.tableJson) as RecapTable
         if (!parsed || !Array.isArray(parsed.headers) || !Array.isArray(parsed.rows)) {
           throw new Error('Format invalide')
         }
-        data = { table: parsed }
+        data.table = parsed
       } catch {
         setMessage('Le tableau JSON est invalide. Vérifie le format avant d’enregistrer.')
+        return
+      }
+    }
+
+    if (form.blocksJson.trim()) {
+      try {
+        const parsedBlocks = JSON.parse(form.blocksJson) as RecapBlock[]
+        if (!Array.isArray(parsedBlocks) || parsedBlocks.some((block) => !block || typeof block.title !== 'string' || typeof block.content !== 'string')) {
+          throw new Error('Format invalide')
+        }
+        data.blocks = parsedBlocks
+      } catch {
+        setMessage('Les rectangles JSON sont invalides. Vérifie le format avant d’enregistrer.')
         return
       }
     }
@@ -97,7 +112,7 @@ export default function LanguageRecap({ selectedLanguage }: Props) {
       section_type: form.section_type,
       title: form.title.trim(),
       content: form.content.trim(),
-      data,
+      data: Object.keys(data).length ? data : {},
       position: Number(form.position) || 1,
     }
 
