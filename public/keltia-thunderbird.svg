@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 220" role="img" aria-label="Oiseau-tonnerre Keltia">
+  <defs>
+    <linearGradient id="stormWing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9fc7d2"/>
+      <stop offset="0.55" stop-color="#3d7182"/>
+      <stop offset="1" stop-color="#123e4d"/>
+    </linearGradient>
+    <linearGradient id="stormBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e6ba79"/>
+      <stop offset="0.5" stop-color="#cb744e"/>
+      <stop offset="1" stop-color="#8f3e3d"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#123745" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M117 102C72 90 42 61 28 23c40 3 78 27 108 67" fill="url(#stormWing)" stroke-width="4"/>
+    <path d="M124 91C95 57 88 29 95 5c29 23 48 54 49 91" fill="url(#stormWing)" stroke-width="4"/>
+    <path d="M142 95c38-16 70-11 96 13-25 21-51 28-80 22l-30 34-38-24 36-20z" fill="url(#stormBody)" stroke-width="4"/>
+    <path d="M197 91c15-22 35-29 59-22-7 13-17 22-31 28l19 11-30 9-22-11z" fill="url(#stormWing)" stroke-width="4"/>
+    <path d="M249 74l9-9-2 16 9 4-18 6" fill="#e6ba79" stroke-width="3"/>
+    <circle cx="231" cy="79" r="3.5" fill="#ff7043" stroke="none"/>
+    <path d="M85 48L54 31M98 61L51 51M112 76L60 72M131 83L82 89" fill="none" stroke="#d6e8ea" stroke-width="2.5"/>
+    <path d="M149 105l-17 16M164 101l-16 21M180 100l-12 20" fill="none" stroke="#f2d39a" stroke-width="3"/>
+    <path d="M137 137c-5 25 1 43 18 58M158 136c11 25 26 39 45 45" fill="none" stroke-width="6"/>
+    <path d="M154 194l-9 13M174 193l4 15M193 181l14 10" fill="none" stroke-width="4"/>
+    <path d="M59 151l-18 11 14 4-7 13 23-18" fill="#2ec4b6" stroke-width="3"/>
+    <path d="M75 170l-18 16 15-2 2 13 12-23" fill="#ff7043" stroke-width="3"/>
+    <path d="M199 145l-12 16 13-3 4 12 10-22" fill="#2ec4b6" stroke-width="3"/>
+  </g>
+</svg>

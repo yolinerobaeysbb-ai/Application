@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keltia - Apercu des templates</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 34px; color: #233530; background: #f1eee8; font-family: 'DM Sans', sans-serif; }
+    h1 { max-width: 820px; margin: 0 auto 10px; font: 600 clamp(28px, 4vw, 48px) 'Playfair Display', serif; text-align: center; }
+    .intro { max-width: 720px; margin: 0 auto 30px; color: #73817b; text-align: center; line-height: 1.6; }
+    .templates { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 20px; max-width: 1280px; margin: auto; }
+    .template { overflow: hidden; border: 1px solid #dfe1da; border-radius: 18px; background: #fffdf8; box-shadow: 0 15px 45px #29453a12; }
+    .template > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    .template > header strong { color: var(--main); font-size: 17px; }
+    .template > header span { color: var(--accent); font-size: 11px; font-weight: 700; }
+    .screen { display: grid; grid-template-columns: 86px 1fr; min-height: 480px; background: var(--bg); }
+    .side { padding: 18px 10px; color: #fff; background: var(--main); }
+    .logo { display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 28px; border: 2px solid var(--gold); border-radius: 12px; color: var(--main); background: #fff; font-weight: 800; }
+    .side i { display: block; width: 40px; height: 7px; margin: 16px auto; border-radius: 20px; background: #ffffff70; }
+    .side i.active { background: var(--gold); }
+    .content { padding: 22px 16px; }
+    .kicker { color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .content h2 { margin: 8px 0 5px; color: var(--main); font: 600 22px 'Playfair Display', serif; }
+    .content p { margin: 0; color: #78847d; font-size: 11px; line-height: 1.5; }
+    .week { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px; padding: 11px; border: 1px solid var(--gold); border-radius: 10px; color: var(--main); background: #fff; font-size: 11px; font-weight: 700; }
+    .cards { display: grid; gap: 9px; }
+    .card { padding: 13px; border-radius: 12px; color: var(--main); }
+    .card strong { display: block; margin-bottom: 5px; font-size: 12px; }
+    .card small { color: #53655e; font-size: 10px; }
+    .card.blue { background: var(--blue); }.card.green { background: var(--green); }.card.orange { background: var(--orange); }
+    .progress { height: 6px; margin-top: 8px; border-radius: 20px; background: #ffffff80; }.progress span { display: block; width: 64%; height: 100%; border-radius: inherit; background: var(--accent); }
+    .template footer { padding: 15px 20px; color: #73817b; background: var(--surface); font-size: 11px; line-height: 1.5; }
+    .executive { --main: #153d4b; --accent: #b47b3d; --gold: #d3ad6c; --bg: #f3f5f3; --surface: #fffdf8; --blue: #dbe9ed; --green: #dfe8dc; --orange: #f1dfcb; }
+    .equilibre { --main: #245447; --accent: #c06e4f; --gold: #d8b77a; --bg: #f7f3eb; --surface: #fffaf2; --blue: #d7e5e5; --green: #dbe7c2; --orange: #efcfad; }
+    .atelier { --main: #253b58; --accent: #c85f3e; --gold: #c9a56b; --bg: #f5eee7; --surface: #fffaf5; --blue: #d8e1ed; --green: #dce2c7; --orange: #f2c5a5; }
+    @media (max-width: 980px) { body { padding: 22px; }.templates { grid-template-columns: 1fr; max-width: 560px; }.screen { min-height: 390px; } }
+  </style>
+</head>
+<body>
+  <h1>Trois visages pour Keltia</h1>
+  <p class="intro">Une comparaison visuelle des directions proposées. Chaque option conserve le logo, la navigation latérale et les mêmes fonctionnalités : seule l’atmosphère change.</p>
+  <main class="templates">
+    <article class="template executive"><header><strong>Keltia</strong><span>01 · EXECUTIVE</span></header><div class="screen"><aside class="side"><div class="logo">K</div><i class="active"></i><i></i><i></i><i></i><i></i></aside><section class="content"><span class="kicker">Votre espace</span><h2>Avancer avec méthode.</h2><p>Un tableau clair pour garder le cap.</p><div class="week">Semaine 04 <span>⌄</span></div><div class="cards"><div class="card blue"><strong>Langues</strong><small>2 sessions · Japonais</small><div class="progress"><span></span></div></div><div class="card green"><strong>Sport</strong><small>Force · 45 minutes</small><div class="progress"><span></span></div></div><div class="card orange"><strong>Nutrition</strong><small>Préparation dimanche</small><div class="progress"><span></span></div></div></div></section></div><footer>Sobre, précis, premium. Pour une expérience très structurée.</footer></article>
+    <article class="template equilibre"><header><strong>Keltia</strong><span>02 · ÉQUILIBRE</span></header><div class="screen"><aside class="side"><div class="logo">K</div><i class="active"></i><i></i><i></i><i></i><i></i></aside><section class="content"><span class="kicker">Votre espace</span><h2>Votre rythme, naturellement.</h2><p>Un accompagnement doux et concret.</p><div class="week">Semaine 04 <span>⌄</span></div><div class="cards"><div class="card blue"><strong>Langues</strong><small>2 sessions · Japonais</small><div class="progress"><span></span></div></div><div class="card green"><strong>Sport</strong><small>Force · 45 minutes</small><div class="progress"><span></span></div></div><div class="card orange"><strong>Nutrition</strong><small>Préparation dimanche</small><div class="progress"><span></span></div></div></div></section></div><footer>Chaleureux, naturel, professionnel. L’option la plus équilibrée.</footer></article>
+    <article class="template atelier"><header><strong>Keltia</strong><span>03 · ATELIER</span></header><div class="screen"><aside class="side"><div class="logo">K</div><i class="active"></i><i></i><i></i><i></i><i></i></aside><section class="content"><span class="kicker">Votre espace</span><h2>Créer un élan durable.</h2><p>Une interface expressive pour votre parcours.</p><div class="week">Semaine 04 <span>⌄</span></div><div class="cards"><div class="card blue"><strong>Langues</strong><small>2 sessions · Japonais</small><div class="progress"><span></span></div></div><div class="card green"><strong>Sport</strong><small>Force · 45 minutes</small><div class="progress"><span></span></div></div><div class="card orange"><strong>Nutrition</strong><small>Préparation dimanche</small><div class="progress"><span></span></div></div></div></section></div><footer>Distinctif, éditorial, plus audacieux. Pour une identité marquée.</footer></article>
+  </main>
+</body>
+</html>

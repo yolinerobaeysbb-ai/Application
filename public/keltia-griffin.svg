@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 220" role="img" aria-label="Griffon Keltia">
+  <defs>
+    <linearGradient id="feather" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9bb8c4"/>
+      <stop offset="0.55" stop-color="#506f7d"/>
+      <stop offset="1" stop-color="#203f4b"/>
+    </linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d9b078"/>
+      <stop offset="0.6" stop-color="#956648"/>
+      <stop offset="1" stop-color="#553f37"/>
+    </linearGradient>
+  </defs>
+  <g stroke="#183b48" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M112 111C68 94 40 57 52 19c32 18 57 45 70 80" fill="url(#feather)" stroke-width="4"/>
+    <path d="M93 83C82 51 88 25 106 5c20 31 26 64 11 98" fill="url(#feather)" stroke-width="4"/>
+    <path d="M72 38l-27-19M79 51L38 39M86 65L42 62M99 78L57 86" fill="none" stroke="#d7e4e5" stroke-width="3"/>
+    <path d="M112 94c22-26 55-36 91-25-8 27-27 48-60 59l-17 41-48-11 28-30-7-24z" fill="url(#fur)" stroke-width="4"/>
+    <path d="M155 58c18-27 47-37 76-24-5 16-17 29-34 37l23 12-34 11-32-14z" fill="url(#feather)" stroke-width="4"/>
+    <path d="M217 36l29-8-17 20 14 12-31-1" fill="#d6aa62" stroke-width="4"/>
+    <path d="M183 45l-10-13M195 43l-2-16" fill="none" stroke="#d6aa62" stroke-width="4"/>
+    <circle cx="215" cy="33" r="3.5" fill="#ec633b" stroke="none"/>
+    <path d="M113 135c-3 24 3 43 19 60M137 131c8 25 23 43 42 52M96 136c-12 19-28 29-48 29" fill="none" stroke-width="7"/>
+    <path d="M66 165l-12 19M85 165l-3 20M154 180l4 20M174 177l13 15" fill="none" stroke-width="4"/>
+    <path d="M125 111c18 0 32 8 41 24" fill="none" stroke="#f2cf9a" stroke-width="5"/>
+    <path d="M58 121c-15-5-29-1-39 10 16 8 31 8 44-1" fill="url(#feather)" stroke-width="4"/>
+    <path d="M186 66l-18 11M199 61l-19 15M211 58l-16 17" fill="none" stroke="#d5e1e3" stroke-width="2.5"/>
+  </g>
+</svg>
