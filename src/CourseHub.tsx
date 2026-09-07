@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Dumbbell, ExternalLink, Leaf, Mic, Send, Volume2 } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import ContentBlocks from './ContentBlocks'
 
 type Activity = { id: string; category: 'language' | 'sport' | 'food'; title: string; description: string; duration_minutes: number | null; language?: string | null; recipe_id?: string | null }
 type Course = { id: string; title: string; summary: string; theory: string; examples: string; level: string | null; source_document: string | null }
@@ -10,9 +9,9 @@ type Comment = { id: string; message: string; created_at: string }
 type Resource = { id: string; resource_type: 'audio' | 'video' | 'document' | 'link'; title: string; url: string }
 type Recipe = { name: string; prep_minutes: number | null; servings: number; instructions: string; preparation_steps: string; ingredients: { name: string; quantity: number | null; unit: string | null }[] }
 type Workout = { program: string; session_name: string; warmup: string; main_workout: string; cooldown: string; equipment: string }
-type Props = { activity: Activity | null; onBack: () => void; onSelectCourse: (activity: Activity) => void; isAdmin: boolean }
+type Props = { activity: Activity | null; onBack: () => void; onSelectCourse: (activity: Activity) => void }
 
-export default function CourseHub({ activity, onBack, onSelectCourse, isAdmin }: Props) {
+export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
   const [course, setCourse] = useState<Course | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [comments, setComments] = useState<Comment[]>([])
@@ -40,7 +39,7 @@ export default function CourseHub({ activity, onBack, onSelectCourse, isAdmin }:
   }, [activity])
   async function loadComments(targetType: string, targetId: string) { const { data } = await supabase.from('module_comments').select('id, message, created_at').eq('target_type', targetType).eq('target_id', targetId).order('created_at', { ascending: false }); setComments((data ?? []) as Comment[]) }
   async function addComment(targetType: string, targetId: string) { const message = comment.trim(); if (!message) return; const userId = (await supabase.auth.getUser()).data.user?.id; if (!userId) return; await supabase.from('module_comments').insert({ user_id: userId, target_type: targetType, target_id: targetId, message }); setComment(''); await loadComments(targetType, targetId) }
-  if (!activity) return <><ContentBlocks surface="courses" isAdmin={isAdmin} /><CourseCatalog onSelectCourse={onSelectCourse} /></>
+  if (!activity) return <CourseCatalog onSelectCourse={onSelectCourse} />
   const label = activity.category === 'language' ? 'Cours de langue' : activity.category === 'sport' ? 'Programme d’entraînement' : 'Recette et nutrition'
   const targetType = activity.category === 'language' ? 'language_course' : activity.category === 'sport' ? 'workout_session' : 'meal_recipe'
   const targetId = course?.id ?? activity.recipe_id ?? activity.id

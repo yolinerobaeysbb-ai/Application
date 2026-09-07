@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Download, FileSpreadsheet, FileText, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from './lib/supabase'
-import ContentBlocks from './ContentBlocks'
 
 type Category = 'language' | 'sport' | 'food'
 type DocumentItem = { id: string; title: string; category: Category; language: string | null; file_path: string; file_name: string; mime_type: string; file_size: number | null }
@@ -16,9 +15,7 @@ const bundledDocuments: DocumentItem[] = [
 ]
 
 type Sheet = { name: string; rows: (string | number | boolean | null)[][] }
-export default function Supports() { return <><ContentBlocks surface="resources" isAdmin={useSessionIsAdmin()} /><SupportsContent /></> }
-
-function SupportsContent() {
+export default function Supports() {
   const [documents, setDocuments] = useState<DocumentItem[]>(bundledDocuments)
   const [selected, setSelected] = useState<DocumentItem | null>(null)
   const [sheets, setSheets] = useState<Sheet[]>([])
