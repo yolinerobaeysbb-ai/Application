@@ -8,6 +8,8 @@ import ProgressDashboard from './ProgressDashboard'
 import AdminLibraryManager from './AdminLibraryManager'
 import AdminScheduleManager from './AdminScheduleManager'
 import AdminSportManager from './AdminSportManager'
+import AdminCourseContentManager from './AdminCourseContentManager'
+import AdminUiSettingsManager from './AdminUiSettingsManager'
 import CourseHub from './CourseHub'
 import Supports from './Supports'
 import LanguageRecap from './LanguageRecap'
@@ -26,7 +28,8 @@ const bundledDocuments: DocumentItem[] = [
   ...[['Mobilité 1', 'Phoenix - Mulsculation - Mobilité 1.xlsx'], ['Adaptation I', 'Phoenix - Musculation - Adapatation I.xlsx'], ['Adaptation II', 'Phoenix - Musculation - Adaptation II.xlsx'], ['Force', 'Phoenix - Musculation - Force.xlsx'], ['Hypertrophie', 'Phoenix - Musculation - Hypertrophie.xlsx'], ['Maintien I', 'Phoenix - Musculation - Maintien I.xlsx'], ['Maintien II', 'Phoenix - Musculation - Maintien II.xlsx'], ['Maintien III', 'Phoenix - Musculation - Maintien III.xlsx'], ['Maintien IV', 'Phoenix - Musculation - Maintien IV.xlsx'], ['Puissance', 'Phoenix - Musculation - Puissance.xlsx']].map(([program, fileName]) => ({ id: `bundled-${program}`, title: `Musculation · ${program}`, category: 'sport' as ContentCategory, language: null, file_path: `/documents/${encodeURIComponent(fileName)}`, file_name: `${program}.xlsx`, mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', file_size: null })),
 ]
 
-type LoginProps = { email: string; password: string; setEmail: (value: string) => void; setPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReset: () => void; error: string; loading: boolean }
+type LoginProps = { email: string; password: string; setEmail: (value: string) => void; setPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReset: () => void; error: string; loading: boolean; uiText?: UiText }
+type UiText = Record<string, string>
 
 function App() {
   const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']>(null)
@@ -39,6 +42,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [selectedActivity, setSelectedActivity] = useState<Parameters<typeof CourseHub>[0]['activity']>(null)
+  const [uiText, setUiText] = useState<UiText>({})
 
   useEffect(() => {
     if (!isSupabaseConfigured) return
@@ -46,6 +50,8 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => { if (isSupabaseConfigured) supabase.from('app_settings').select('setting_key, setting_value').then(({ data }) => setUiText(Object.fromEntries((data ?? []).map((item) => [item.setting_key, item.setting_value])))) }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
@@ -67,7 +73,7 @@ function App() {
 
   async function handleLogout() { await supabase.auth.signOut(); setSession(null) }
   if (!isSupabaseConfigured) return <SetupNotice />
-  if (!session) return <LoginPage email={email} password={password} setEmail={setEmail} setPassword={setPassword} onSubmit={handleLogin} onReset={() => void handleReset()} error={authError} loading={loading} />
+  if (!session) return <LoginPageWithText email={email} password={password} setEmail={setEmail} setPassword={setPassword} onSubmit={handleLogin} onReset={() => void handleReset()} error={authError} loading={loading} uiText={uiText} />
   const isAdmin = session.user.email?.toLowerCase() === ADMIN_EMAIL
 
   const navigate = (nextTab: Tab) => { setTab(nextTab); if (nextTab === 'courses') setSelectedActivity(null); setSidebarOpen(false) }
@@ -76,8 +82,8 @@ function App() {
     <Sidebar activeTab={tab} isAdmin={isAdmin} email={session.user.email ?? ''} open={sidebarOpen} onNavigate={navigate} onClose={() => setSidebarOpen(false)} />
     {sidebarOpen && <button className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" />}
     <div className="app-main"><header className="app-header"><button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu size={21} /></button><div><p className="header-kicker">Espace membre</p><strong>Keltia</strong></div><div className="header-actions">{isAdmin && <NotificationBell />}<button className="avatar-button" onClick={() => navigate('settings')} aria-label="Ouvrir les paramètres"><UserRound size={18} /></button></div></header>
-      <main className="page-content"><section className="welcome-row"><div><p className="eyebrow">Bonjour{session.user.email ? `, ${session.user.email.split('@')[0]}` : ''}</p><h1>Votre espace pour progresser.</h1><p className="muted">Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>
-        {tab === 'planning' && <><PlanningV2 week={week} setWeek={setWeek} isAdmin={isAdmin} onOpenActivity={openActivity} />{isAdmin && <AdminScheduleManager week={week} />}</>}{tab === 'courses' && <>{isAdmin && <><AdminLibraryManager /><AdminSportManager /></>}<CourseHub activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} /></>}{tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}{tab === 'resources' && <Supports />}{tab === 'progress' && <ProgressDashboard userId={session.user.id} />}{tab === 'suggestions' && <SuggestionsV2 isAdmin={isAdmin} userId={session.user.id} />}{tab === 'settings' && <SettingsPanel email={session.user.email ?? ''} isAdmin={isAdmin} darkMode={darkMode} onDarkModeChange={setDarkMode} onLogout={() => void handleLogout()} />}{isAdmin && tab !== 'settings' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
+      <main className="page-content"><section className="welcome-row"><div><p className="eyebrow">Bonjour{session.user.email ? `, ${session.user.email.split('@')[0]}` : ''}</p><h1>{uiText.welcome_title || 'Votre espace pour progresser.'}</h1><p className="muted">{uiText.welcome_text || 'Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.'}</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>
+        {tab === 'planning' && <><PlanningV2 week={week} setWeek={setWeek} isAdmin={isAdmin} onOpenActivity={openActivity} />{isAdmin && <AdminScheduleManager week={week} />}</>}{tab === 'courses' && <>{isAdmin && <><AdminLibraryManager /><AdminSportManager /><AdminCourseContentManager /></>}<CourseHub activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} /></>}{tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}{tab === 'resources' && <Supports />}{tab === 'progress' && <ProgressDashboard userId={session.user.id} />}{tab === 'suggestions' && <SuggestionsV2 isAdmin={isAdmin} userId={session.user.id} />}{tab === 'settings' && <><SettingsPanel email={session.user.email ?? ''} isAdmin={isAdmin} darkMode={darkMode} onDarkModeChange={setDarkMode} onLogout={() => void handleLogout()} />{isAdmin && <AdminUiSettingsManager onSaved={setUiText} />}</>}{isAdmin && tab !== 'settings' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
       </main><footer>KELTIA <span>·</span> espace privé membre</footer></div>
   </div>
 }
@@ -95,7 +101,8 @@ function Sidebar({ activeTab, isAdmin, email, open, onNavigate, onClose }: { act
   return <aside className={`sidebar ${open ? 'is-open' : ''}`}><div className="sidebar-top"><KeltiaMark /><button className="sidebar-close" onClick={onClose} aria-label="Fermer le menu"><X size={19} /></button></div><div className="sidebar-label">Navigation</div><nav className="sidebar-nav" aria-label="Navigation principale">{items.map((item, index) => <button className={`sidebar-link ${activeTab === item.tab && (index !== 2 || activeTab === 'resources') ? 'active' : ''}`} key={`${item.label}-${index}`} onClick={() => onNavigate(item.tab)}>{item.icon}<span><strong>{item.label}</strong><small>{item.caption}</small></span></button>)}</nav><div className="sidebar-bottom"><button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => onNavigate('settings')}><Settings size={18} /><span><strong>Paramètres</strong><small>Compte et préférences</small></span></button><div className="sidebar-user"><span className="user-avatar">{email.slice(0, 1).toUpperCase() || 'K'}</span><span><strong>{email.split('@')[0] || 'Membre'}</strong><small>{isAdmin ? 'Administrateur' : 'Membre'}</small></span></div></div></aside>
 }
 function SettingsPanel({ email, isAdmin, darkMode, onDarkModeChange, onLogout }: { email: string; isAdmin: boolean; darkMode: boolean; onDarkModeChange: (value: boolean) => void; onLogout: () => void }) { return <section className="settings-page"><div className="section-intro"><p className="eyebrow">Votre compte</p><h2>Paramètres</h2><p className="muted">Gérez votre profil et les préférences de votre espace Keltia.</p></div><div className="settings-grid"><article className="settings-card profile-card"><div className="profile-avatar">{email.slice(0, 1).toUpperCase() || 'K'}</div><div><p className="card-kicker">Profil</p><h3>{email.split('@')[0] || 'Membre Keltia'}</h3><p className="muted">{email}</p><span className="role-pill">{isAdmin ? 'Administrateur' : 'Membre'}</span></div></article><article className="settings-card"><div className="setting-row"><span className="setting-icon"><Moon size={18} /></span><span><strong>Apparence sombre</strong><small>Adapter l’affichage à votre environnement</small></span><button className={`toggle ${darkMode ? 'on' : ''}`} onClick={() => onDarkModeChange(!darkMode)} aria-label="Activer ou désactiver le mode sombre" aria-pressed={darkMode}><span /></button></div><div className="setting-row"><span className="setting-icon"><Sun size={18} /></span><span><strong>Thème actuel</strong><small>{darkMode ? 'Sombre' : 'Clair'}</small></span></div></article><article className="settings-card danger-card"><div><p className="card-kicker">Session</p><h3>Quitter Keltia</h3><p className="muted">Vous pourrez vous reconnecter à tout moment avec votre adresse email.</p></div><button className="logout-button" onClick={onLogout}><LogOut size={16} /> Se déconnecter</button></article></div></section> }
-function LoginPage({ email, password, setEmail, setPassword, onSubmit, onReset, error, loading }: LoginProps) { return <div className="login-page polar-login"><div className="login-art"><KeltiaMark large /><p className="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>Un rythme qui vous ressemble.</h1><p>Langues, mouvement et nutrition réunis dans un espace simple, calme et privé.</p></div><form className="login-card" onSubmit={onSubmit}><KeltiaMark large /><h2>Bienvenue.</h2><p className="muted">Connectez-vous pour retrouver votre parcours.</p><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></label><label>Mot de passe<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button" disabled={loading}>{loading ? 'Connexion...' : 'Ouvrir mon espace'}</button><button className="reset-button" type="button" onClick={onReset}>Mot de passe oublié ?</button></form></div> }
+function LoginPageWithText({ uiText, ...props }: LoginProps & { uiText: UiText }) { return <div className="login-page polar-login"><div className="login-art"><KeltiaMark large /><p className="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>{uiText.login_hero_title || 'Un rythme qui vous ressemble.'}</h1><p>{uiText.login_hero_text || 'Langues, mouvement et nutrition réunis dans un espace simple, calme et privé.'}</p></div><form className="login-card" onSubmit={props.onSubmit}><KeltiaMark large /><h2>{uiText.login_title || 'Bienvenue.'}</h2><p className="muted">{uiText.login_text || 'Connectez-vous pour retrouver votre parcours.'}</p><label>Email<input type="email" value={props.email} onChange={(event) => props.setEmail(event.target.value)} required autoComplete="email" /></label><label>Mot de passe<input type="password" value={props.password} onChange={(event) => props.setPassword(event.target.value)} required autoComplete="current-password" /></label>{props.error && <p className="form-error">{props.error}</p>}<button className="primary-button" disabled={props.loading}>{props.loading ? 'Connexion...' : uiText.login_button || 'Ouvrir mon espace'}</button><button className="reset-button" type="button" onClick={props.onReset}>Mot de passe oublié ?</button></form></div> }
+function LoginPage({ email, password, setEmail, setPassword, onSubmit, onReset, error, loading }: LoginProps) { return <LoginPageWithText uiText={{}} email={email} password={password} setEmail={setEmail} setPassword={setPassword} onSubmit={onSubmit} onReset={onReset} error={error} loading={loading} /> }
 function SetupNotice() { return <div className="setup-page"><div className="setup-card"><KeltiaMark large /><h1>La base de données attend ses clés.</h1><p className="muted">Créez un fichier <code>.env.local</code> à la racine avec <code>VITE_SUPABASE_URL</code> et <code>VITE_SUPABASE_ANON_KEY</code>, puis relancez le serveur.</p><div className="code-block">VITE_SUPABASE_URL=https://...supabase.co<br />VITE_SUPABASE_ANON_KEY=...</div></div></div> }
 function Planning({ week, isAdmin }: { week: number; isAdmin: boolean }) {
   const [items, setItems] = useState<ContentItem[]>([])
@@ -120,3 +127,4 @@ void Suggestions
 void Resources
 
 export default App
+void LoginPage
