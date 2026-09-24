@@ -26,7 +26,7 @@ export default function AdminImpersonationPanel() {
     const sessionKey = `keltia-impersonation-${crypto.randomUUID()}`
     const { data, error } = await supabase.functions.invoke('admin-start-impersonation', { body: { userId: selectedUserId } })
     if (error || !data?.token_hash) {
-      setMessage(error?.message ?? 'Impossible de démarrer la simulation.')
+      setMessage(error?.message ? `${error.message} — vérifiez que la fonction "admin-start-impersonation" est déployée sur Supabase (supabase functions deploy admin-start-impersonation).` : 'Impossible de démarrer la simulation.')
       setStarting(false)
       return
     }
