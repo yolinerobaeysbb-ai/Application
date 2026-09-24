@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { BookOpen, Dumbbell, Plus, Utensils } from 'lucide-react'
+import { BookOpen, Dumbbell, Pin, Plus, Utensils } from 'lucide-react'
 import AdminScheduleManager from './AdminScheduleManager'
 
-type Category = 'language' | 'sport' | 'food'
+type Category = 'language' | 'sport' | 'food' | 'fixed'
 
 export default function AdminWeeklyActivities({ week, setWeek, currentUserId }: { week: number; setWeek: (week: number) => void; currentUserId: string }) {
   const [category, setCategory] = useState<Category | null>(null)
@@ -13,7 +13,9 @@ export default function AdminWeeklyActivities({ week, setWeek, currentUserId }: 
       <button className={`admin-rect ${category === 'language' ? 'active' : ''}`} type="button" onClick={() => setCategory('language')}><BookOpen size={20} /><span>Langues</span></button>
       <button className={`admin-rect ${category === 'sport' ? 'active' : ''}`} type="button" onClick={() => setCategory('sport')}><Dumbbell size={20} /><span>Sport</span></button>
       <button className={`admin-rect ${category === 'food' ? 'active' : ''}`} type="button" onClick={() => setCategory('food')}><Utensils size={20} /><span>Nourriture</span></button>
+      <button className={`admin-rect ${category === 'fixed' ? 'active' : ''}`} type="button" onClick={() => setCategory('fixed')}><Pin size={20} /><span>Activités fixes</span></button>
     </div>
     <AdminScheduleManager week={week} currentUserId={currentUserId} categoryFilter={category ?? undefined} />
   </section>
 }
+

@@ -94,3 +94,31 @@ main { padding-top: clamp(55px, 9vw, 105px); }.welcome-row { display: flex; alig
 .recipe-photo-preview { display: block; width: 100%; max-width: 220px; margin-top: 8px; border-radius: 10px; object-fit: cover; }
 @media (max-width: 900px) { .admin-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-a1-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .admin-card-grid { grid-template-columns: 1fr; } .admin-a1-grid { grid-template-columns: 1fr; } }
+
+/* Global calendar: view switch, month/year grids, and the free-slot assistant bar. */
+.calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin: 24px 0; }
+.calendar-view-switch { display: flex; gap: 6px; }
+.calendar-view-switch button { padding: 9px 12px; border: 1px solid var(--keltia-line); border-radius: 9px; color: var(--keltia-muted); background: var(--keltia-surface); font-weight: 700; font-size: 12px; }
+.calendar-view-switch button.active { color: var(--keltia-green); border-color: var(--keltia-gold); background: color-mix(in srgb, var(--keltia-gold) 15%, transparent); }
+.calendar-nav { display: flex; align-items: center; gap: 10px; color: var(--keltia-green); }
+.calendar-nav button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--keltia-line); border-radius: 8px; color: var(--keltia-green); background: var(--keltia-surface); }
+.free-slot-bar { margin-bottom: 18px; }
+.free-slot-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.free-slot-chip { padding: 7px 11px; border-radius: 999px; color: #194c3b; background: #d8f6ec; font-size: 12px; font-weight: 700; }
+.calendar-day-list { display: grid; gap: 10px; }
+.calendar-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 20px; }
+.calendar-month-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; padding: 8px; border: 1px solid var(--keltia-line); border-radius: 10px; background: var(--keltia-surface); color: var(--keltia-ink); font-size: 12px; }
+.calendar-month-cell.muted-cell { opacity: .4; }
+.calendar-month-cell.active { border-color: var(--keltia-gold); background: color-mix(in srgb, var(--keltia-gold) 15%, transparent); }
+.calendar-month-cell em { color: var(--keltia-gold); font-style: normal; font-weight: 700; font-size: 11px; }
+.calendar-year-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
+.calendar-feed-row { display: flex; gap: 8px; margin-top: 12px; }
+.calendar-feed-row input { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--keltia-line); border-radius: 9px; color: var(--keltia-ink); background: var(--keltia-bg); font-size: 12px; }
+@media (max-width: 720px) { .calendar-month-grid { grid-template-columns: repeat(7, minmax(34px, 1fr)); } .calendar-year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Progress: fatigue-aware suggestions and health questionnaire. */
+.health-quick-card { margin-bottom: 18px; }
+.health-quick-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 12px; }
+.health-quick-row label { display: grid; gap: 6px; color: var(--keltia-green); font-size: 12px; font-weight: 700; }
+.health-quick-row select, .health-quick-row input { padding: 10px; border: 1px solid var(--keltia-line); border-radius: 9px; color: var(--keltia-ink); background: var(--keltia-surface); }
+.health-tips { display: grid; gap: 8px; margin: 14px 0 0; padding-left: 18px; color: var(--keltia-ink); font-size: 13px; }
