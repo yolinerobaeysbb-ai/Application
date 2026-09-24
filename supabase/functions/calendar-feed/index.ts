@@ -32,10 +32,12 @@ Deno.serve(async (request) => {
   const { data: tokenRow } = await client.from('calendar_feed_tokens').select('user_id').eq('token', token).maybeSingle()
   if (!tokenRow) return new Response('Invalid token', { status: 404, headers: corsHeaders })
 
+  const { data: profileRow } = await client.from('profiles').select('calendar_start_date').eq('id', tokenRow.user_id).maybeSingle()
   const { data: settingRow } = await client.from('app_settings').select('setting_value').eq('setting_key', 'program_start_date').maybeSingle()
-  const start = settingRow?.setting_value ? new Date(settingRow.setting_value) : new Date()
+  const resolvedStart = profileRow?.calendar_start_date ?? settingRow?.setting_value
+  const start = resolvedStart ? new Date(resolvedStart) : new Date()
 
-  const { data: rows } = await client.from('weekly_schedule_items').select('id, category, title, description, day_of_week, week_number, start_time, end_time, duration_minutes, recurrence').or(`user_id.is.null,user_id.eq.${tokenRow.user_id}`)
+  const { data: rows } = await client.from('weekly_schedule_items').select('id, category, title, description, day_of_week, week_number, start_time, end_time, duration_minutes, recurrence').neq('category', 'food').or(`user_id.is.null,user_id.eq.${tokenRow.user_id}`)
 
   const events = ((rows ?? []) as Row[]).flatMap((row) => expand(row, start).map((date) => {
     const [startHours, startMinutes] = (row.start_time ?? '09:00').split(':').map(Number)
