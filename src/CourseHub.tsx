@@ -557,6 +557,7 @@ function CourseCatalog({
                 >
                   <span className="catalog-language">{course.language}</span>
                   <strong>{course.title}</strong>
+                  <MathContent inline value={course.summary} className="catalog-description" />
                   <small>
                     {course.week_number
                       ? `Semaine ${course.week_number}`
@@ -590,6 +591,7 @@ function CourseCatalog({
                   Semaine {item.week_number}
                 </span>
                 <strong>{item.title}</strong>
+                <MathContent inline value={item.description} className="catalog-description" />
                 <small>Activité fixe</small>
               </button>
             ))
@@ -643,6 +645,7 @@ function CourseCatalog({
               >
                 <span className="catalog-language">Recette</span>
                 <strong>{recipe.name}</strong>
+                <MathContent inline value={recipe.instructions} className="catalog-description" />
                 <small>Voir ingrédients et préparation</small>
               </button>
             ))

@@ -18,10 +18,11 @@ function parseMath(value: string): Part[] {
   return parts
 }
 
-export function MathContent({ value, className }: { value: string; className?: string }) {
-  return <div className={className}>{parseMath(value).map((part, index) => part.expression === undefined
+export function MathContent({ value, className, inline = false }: { value: string; className?: string; inline?: boolean }) {
+  const Wrapper = inline ? 'span' : 'div'
+  return <Wrapper className={className}>{parseMath(value).map((part, index) => part.expression === undefined
     ? <span className="math-text" key={index}>{part.value}</span>
-    : <span className={part.display ? 'math-display' : 'math-inline'} key={index} dangerouslySetInnerHTML={{ __html: katex.renderToString(part.expression, { displayMode: part.display, throwOnError: false, strict: 'ignore', trust: false }) }} />)}</div>
+    : <span className={part.display ? 'math-display' : 'math-inline'} key={index} dangerouslySetInnerHTML={{ __html: katex.renderToString(part.expression, { displayMode: part.display, throwOnError: false, strict: 'ignore', trust: false }) }} />)}</Wrapper>
 }
 
 export default function MathField({ label, value, onChange, rows = 4 }: { label: string; value: string; onChange: (value: string) => void; rows?: number }) {

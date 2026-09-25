@@ -6,4 +6,5 @@
 .math-inline { display: inline-block; }
 .math-display { display: block; overflow-x: auto; }
 .lesson-summary { margin: 6px 0 12px; color: var(--keltia-green); font-size: 1.1rem; font-weight: 700; }
+.catalog-description { display: block; color: var(--keltia-muted); font-size: 12px; font-weight: 400; line-height: 1.45; }
 .lesson-copy .math-display, .examples .math-display { margin: 10px 0; }
