@@ -1,0 +1,9 @@
+.math-field > textarea { font-family: 'DM Mono', monospace; line-height: 1.6; }
+.math-field > small { color: var(--keltia-muted); font-size: 11px; font-weight: 400; }
+.math-preview { display: grid; gap: 8px; min-height: 48px; padding: 12px; border: 1px solid var(--keltia-line); border-radius: 9px; background: var(--keltia-surface); color: var(--keltia-ink); font-weight: 400; overflow-x: auto; }
+.math-preview .katex-display, .math-display .katex-display { margin: .6em 0; }
+.math-text { white-space: pre-wrap; }
+.math-inline { display: inline-block; }
+.math-display { display: block; overflow-x: auto; }
+.lesson-summary { margin: 6px 0 12px; color: var(--keltia-green); font-size: 1.1rem; font-weight: 700; }
+.lesson-copy .math-display, .examples .math-display { margin: 10px 0; }

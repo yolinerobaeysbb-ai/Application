@@ -1,96 +1,1033 @@
-import { useEffect, useState } from 'react'
-import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Dumbbell, ExternalLink, Leaf, Mic, Pin, Send, Volume2 } from 'lucide-react'
-import { supabase } from './lib/supabase'
-import CourseDataView from './CourseDataView'
-type Activity = { id: string; category: 'language' | 'sport' | 'food' | 'fixed'; title: string; description: string; duration_minutes: number | null; language?: string | null; recipe_id?: string | null }
-type Course = { id: string; title: string; summary: string; theory: string; examples: string; level: string | null; source_document: string | null; data?: Record<string, unknown> }
-type Exercise = { id: string; prompt: string; answer: string; expected_answer: string; explanation: string; exercise_type: 'written' | 'oral' }
-type Comment = { id: string; message: string; created_at: string }
-type Resource = { id: string; resource_type: 'audio' | 'video' | 'document' | 'link'; title: string; url: string }
-type Recipe = { name: string; prep_minutes: number | null; servings: number; instructions: string; preparation_steps: string; ingredients: { name: string; quantity: number | null; unit: string | null }[] }
-type Workout = { program: string; session_name: string; warmup: string; main_workout: string; cooldown: string; equipment: string }
-type Props = { activity: Activity | null; onBack: () => void; onSelectCourse: (activity: Activity) => void }
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  Clock3,
+  Dumbbell,
+  ExternalLink,
+  Leaf,
+  Mic,
+  Pin,
+  Send,
+  Volume2,
+} from "lucide-react";
+import { supabase } from "./lib/supabase";
+import CourseDataView from "./CourseDataView";
+import { MathContent } from "./MathField";
+import "./math.css";
+type Activity = {
+  id: string;
+  category: "language" | "sport" | "food" | "fixed";
+  title: string;
+  description: string;
+  duration_minutes: number | null;
+  language?: string | null;
+  recipe_id?: string | null;
+};
+type Course = {
+  id: string;
+  title: string;
+  summary: string;
+  theory: string;
+  examples: string;
+  level: string | null;
+  source_document: string | null;
+  data?: Record<string, unknown>;
+};
+type Exercise = {
+  id: string;
+  prompt: string;
+  answer: string;
+  expected_answer: string;
+  explanation: string;
+  exercise_type: "written" | "oral";
+};
+type Comment = { id: string; message: string; created_at: string };
+type Resource = {
+  id: string;
+  resource_type: "audio" | "video" | "document" | "link";
+  title: string;
+  url: string;
+};
+type Recipe = {
+  name: string;
+  prep_minutes: number | null;
+  servings: number;
+  instructions: string;
+  preparation_steps: string;
+  ingredients: { name: string; quantity: number | null; unit: string | null }[];
+};
+type Workout = {
+  program: string;
+  session_name: string;
+  warmup: string;
+  main_workout: string;
+  cooldown: string;
+  equipment: string;
+};
+type Props = {
+  activity: Activity | null;
+  onBack: () => void;
+  onSelectCourse: (activity: Activity) => void;
+};
 
 export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
-  const [course, setCourse] = useState<Course | null>(null)
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [comments, setComments] = useState<Comment[]>([])
-  const [recipe, setRecipe] = useState<Recipe | null>(null)
-  const [workout, setWorkout] = useState<Workout | null>(null)
-  const [resources, setResources] = useState<Resource[]>([])
-  const [comment, setComment] = useState('')
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [validated, setValidated] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)
-  async function reloadExercises(courseId: string) { const exerciseResult = await supabase.from('language_exercises').select('id, prompt, answer, expected_answer, explanation, exercise_type').eq('course_id', courseId).order('position'); setExercises((exerciseResult.data ?? []) as Exercise[]) }
+  const [course, setCourse] = useState<Course | null>(null);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [workout, setWorkout] = useState<Workout | null>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [comment, setComment] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [validated, setValidated] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(false);
+  async function reloadExercises(courseId: string) {
+    const exerciseResult = await supabase
+      .from("language_exercises")
+      .select("id, prompt, answer, expected_answer, explanation, exercise_type")
+      .eq("course_id", courseId)
+      .order("position");
+    setExercises((exerciseResult.data ?? []) as Exercise[]);
+  }
   useEffect(() => {
     async function load() {
-      if (!activity) return
-      setLoading(true); setCourse(null); setExercises([])
-      if (activity.category === 'language') {
-        const { data } = await supabase.from('language_courses').select('id, title, summary, theory, examples, level, source_document, data').eq('language', activity.language ?? activity.title).eq('title', activity.title).maybeSingle()
-        const current = data as Course | null
-        setCourse(current ?? { id: activity.id, title: activity.title, summary: activity.description, theory: 'Le contenu complet de ce cours sera enrichi depuis le manuel associé.', examples: 'Relisez les exemples du support puis produisez vos propres phrases.', level: null, source_document: null, data: {} })
-        if (current) { const exerciseResult = await supabase.from('language_exercises').select('id, prompt, answer, expected_answer, explanation, exercise_type').eq('course_id', current.id).order('position'); setExercises((exerciseResult.data ?? []) as Exercise[]); const resourceResult = await supabase.from('language_course_resources').select('id, resource_type, title, url').eq('course_id', current.id).order('created_at'); setResources((resourceResult.data ?? []) as Resource[]); await loadComments('language_course', current.id) }
-      } else if (activity.category === 'sport') { const workoutResult = await supabase.from('workout_sessions').select('program, session_name, warmup, main_workout, cooldown, equipment').eq('schedule_item_id', activity.id).maybeSingle(); setWorkout((workoutResult.data ?? null) as Workout | null); await loadComments('workout_session', activity.id) } else if (activity.recipe_id) { const recipeResult = await supabase.from('meal_recipes').select('name, prep_minutes, servings, instructions, preparation_steps, recipe_ingredients(name, quantity, unit)').eq('id', activity.recipe_id).maybeSingle(); if (recipeResult.data) { const data = recipeResult.data as Recipe & { recipe_ingredients: Recipe['ingredients'] }; setRecipe({ ...data, ingredients: data.recipe_ingredients ?? [] }) }; await loadComments('meal_recipe', activity.recipe_id) }
-      setLoading(false)
+      if (!activity) return;
+      setLoading(true);
+      setCourse(null);
+      setExercises([]);
+      if (activity.category === "language") {
+        const { data } = await supabase
+          .from("language_courses")
+          .select(
+            "id, title, summary, theory, examples, level, source_document, data",
+          )
+          .eq("language", activity.language ?? activity.title)
+          .eq("title", activity.title)
+          .maybeSingle();
+        const current = data as Course | null;
+        setCourse(
+          current ?? {
+            id: activity.id,
+            title: activity.title,
+            summary: activity.description,
+            theory:
+              "Le contenu complet de ce cours sera enrichi depuis le manuel associé.",
+            examples:
+              "Relisez les exemples du support puis produisez vos propres phrases.",
+            level: null,
+            source_document: null,
+            data: {},
+          },
+        );
+        if (current) {
+          const exerciseResult = await supabase
+            .from("language_exercises")
+            .select(
+              "id, prompt, answer, expected_answer, explanation, exercise_type",
+            )
+            .eq("course_id", current.id)
+            .order("position");
+          setExercises((exerciseResult.data ?? []) as Exercise[]);
+          const resourceResult = await supabase
+            .from("language_course_resources")
+            .select("id, resource_type, title, url")
+            .eq("course_id", current.id)
+            .order("created_at");
+          setResources((resourceResult.data ?? []) as Resource[]);
+          await loadComments("language_course", current.id);
+        }
+      } else if (activity.category === "sport") {
+        const workoutResult = await supabase
+          .from("workout_sessions")
+          .select(
+            "program, session_name, warmup, main_workout, cooldown, equipment",
+          )
+          .eq("schedule_item_id", activity.id)
+          .maybeSingle();
+        setWorkout((workoutResult.data ?? null) as Workout | null);
+        await loadComments("workout_session", activity.id);
+      } else if (activity.recipe_id) {
+        const recipeResult = await supabase
+          .from("meal_recipes")
+          .select(
+            "name, prep_minutes, servings, instructions, preparation_steps, recipe_ingredients(name, quantity, unit)",
+          )
+          .eq("id", activity.recipe_id)
+          .maybeSingle();
+        if (recipeResult.data) {
+          const data = recipeResult.data as Recipe & {
+            recipe_ingredients: Recipe["ingredients"];
+          };
+          setRecipe({ ...data, ingredients: data.recipe_ingredients ?? [] });
+        }
+        await loadComments("meal_recipe", activity.recipe_id);
+      }
+      setLoading(false);
     }
-    void load()
-    setComment(''); setAnswers({}); setValidated({})
-  }, [activity])
+    void load();
+    setComment("");
+    setAnswers({});
+    setValidated({});
+  }, [activity]);
   useEffect(() => {
-    if (!activity || activity.category !== 'sport' || !activity.id.startsWith('program-')) return
+    if (
+      !activity ||
+      activity.category !== "sport" ||
+      !activity.id.startsWith("program-")
+    )
+      return;
     void (async () => {
-      const schedule = await supabase.from('weekly_schedule_items').select('id').eq('category', 'sport').eq('title', activity.title).limit(1).maybeSingle()
-      if (!schedule.data?.id) return
-      const workoutResult = await supabase.from('workout_sessions').select('program, session_name, warmup, main_workout, cooldown, equipment').eq('schedule_item_id', schedule.data.id).maybeSingle()
-      setWorkout((workoutResult.data ?? null) as Workout | null)
-    })()
-  }, [activity])
-  async function loadComments(targetType: string, targetId: string) { const { data } = await supabase.from('module_comments').select('id, message, created_at').eq('target_type', targetType).eq('target_id', targetId).order('created_at', { ascending: false }); setComments((data ?? []) as Comment[]) }
-  async function addComment(targetType: string, targetId: string) { const message = comment.trim(); if (!message) return; const userId = (await supabase.auth.getUser()).data.user?.id; if (!userId) return; await supabase.from('module_comments').insert({ user_id: userId, target_type: targetType, target_id: targetId, message }); setComment(''); await loadComments(targetType, targetId) }
-  if (!activity) return <CourseCatalog onSelectCourse={onSelectCourse} />
-  const label = activity.category === 'language' ? 'Cours de langue' : activity.category === 'sport' ? 'Programme d’entraînement' : activity.category === 'fixed' ? 'Activité fixe' : 'Recette et nutrition'
-  const targetType = activity.category === 'language' ? 'language_course' : activity.category === 'sport' ? 'workout_session' : activity.category === 'fixed' ? 'fixed_activity' : 'meal_recipe'
-  const targetId = course?.id ?? activity.recipe_id ?? activity.id
-    return <section className="course-hub"><CourseDataView data={course?.data ?? {}} /><button className="back-link" onClick={onBack}><ArrowLeft size={16} /> Retour au planning</button><div className="hub-hero"><span className={`hub-icon ${activity.category}`}>{activity.category === 'language' ? <BookOpen /> : activity.category === 'sport' ? <Dumbbell /> : activity.category === 'fixed' ? <Pin /> : <Leaf />}</span><div><p className="eyebrow">{label}</p><h2>{course?.title ?? activity.title}</h2><p className="muted">{activity.duration_minutes ? `${activity.duration_minutes} minutes · ` : ''}{activity.description}</p></div></div>{loading ? <p className="loading-state">Chargement du contenu complet...</p> : activity.category === 'language' && course ? <LanguageLesson course={course} resources={resources} exercises={exercises} answers={answers} setAnswers={setAnswers} validated={validated} setValidated={setValidated} onExerciseAdded={reloadExercises} /> : activity.category === 'sport' ? <SportLesson activity={activity} workout={workout} validated={validated.activity ?? false} setValidated={(value) => setValidated({ activity: value })} /> : activity.category === 'fixed' ? <article className="lesson-card full-width"><h3>{activity.title}</h3><p>{activity.description || 'Activité personnelle sans contenu additionnel.'}</p></article> : <FoodLesson activity={activity} recipe={recipe} validated={validated.activity ?? false} setValidated={(value) => setValidated({ activity: value })} />}{<Comments comments={comments} value={comment} setValue={setComment} onSubmit={() => void addComment(targetType, targetId)} />}</section>
-}
-
-function CourseCatalog({ onSelectCourse }: { onSelectCourse: (activity: Activity) => void }) {
-  const [courses, setCourses] = useState<{ id: string; language: string; title: string; summary: string; week_number: number | null }[]>([])
-  const [recipes, setRecipes] = useState<{ id: string; name: string; instructions: string; meal_type: string }[]>([])
-  const [filter, setFilter] = useState<'language' | 'sport' | 'food' | 'fixed'>('language')
-  const [languageFilter, setLanguageFilter] = useState('Toutes')
-  const [sportFilter, setSportFilter] = useState('')
-  const [sportOptions, setSportOptions] = useState<string[]>([])
-  const [mealSlot, setMealSlot] = useState<string | null>(null)
-  const [sportItems, setSportItems] = useState<{ id: string; title: string; description: string; duration_minutes: number | null; week_number: number }[]>([])
-  const [fixedItems, setFixedItems] = useState<{ id: string; title: string; description: string; duration_minutes: number | null; week_number: number }[]>([])
-  const sportPrograms = Array.from(new Set(sportItems.map((item) => item.title)))
-  const mealSlots = [{ key: 'breakfast', label: 'Matin' }, { key: 'lunch', label: 'Midi' }, { key: 'snack', label: '16h' }, { key: 'dinner', label: 'Soir' }]
-  useEffect(() => { supabase.from('language_courses').select('id, language, title, summary, week_number').order('language').order('course_number').then(({ data }) => setCourses(data ?? [])); supabase.from('meal_recipes').select('id, name, instructions, meal_type').order('name').then(({ data }) => setRecipes((data ?? []) as { id: string; name: string; instructions: string; meal_type: string }[])); supabase.from('weekly_schedule_items').select('id, title, description, duration_minutes, week_number').eq('category', 'sport').order('week_number').order('day_of_week').then(({ data }) => setSportItems((data ?? []) as { id: string; title: string; description: string; duration_minutes: number | null; week_number: number }[])); supabase.from('weekly_schedule_items').select('id, title, description, duration_minutes, week_number').eq('category', 'fixed').order('week_number').order('day_of_week').then(({ data }) => setFixedItems((data ?? []) as { id: string; title: string; description: string; duration_minutes: number | null; week_number: number }[])); supabase.from('content_type_options').select('label').eq('kind', 'sport').order('label').then(({ data }) => setSportOptions((data ?? []).map((row) => row.label as string))) }, [])
-  const filterButtons = [{ value: 'language' as const, label: 'Langues', caption: 'Cours par langue et par semaine' }, { value: 'sport' as const, label: 'Sport', caption: 'Programmes d’entraînement' }, { value: 'food' as const, label: 'Nourriture', caption: 'Recettes et préparation' }, { value: 'fixed' as const, label: 'Activités fixes', caption: 'Vos rendez-vous récurrents' }]
-  const languagesInCourses = ['Toutes', ...Array.from(new Set(courses.map((course) => course.language)))]
-  const visibleRecipes = recipes.filter((recipe) => !mealSlot || recipe.meal_type === mealSlot)
-  return <section className="course-catalog"><div className="section-intro"><p className="eyebrow">Plan & Plate</p><h2>Votre bibliothèque de parcours.</h2><p className="muted">Choisissez un domaine, puis une langue ou une discipline.</p></div><div className="admin-card-grid">{filterButtons.map((button) => <button className={`admin-card ${filter === button.value ? 'active' : ''}`} key={button.value} onClick={() => { setFilter(button.value); setMealSlot(null) }}><strong>{button.label}</strong><span>{button.caption}</span></button>)}</div>{filter === 'language' && <label className="catalog-select"><span>Langue</span><select value={languageFilter} onChange={(event) => setLanguageFilter(event.target.value)}>{languagesInCourses.map((language) => <option key={language}>{language}</option>)}</select></label>}{filter === 'sport' && <label className="catalog-select"><span>Discipline</span><select value={sportFilter} onChange={(event) => setSportFilter(event.target.value)}><option value="">Toutes</option>{sportOptions.map((option) => <option key={option}>{option}</option>)}</select></label>}{filter === 'food' && !mealSlot && <div className="admin-icon-grid">{mealSlots.map((slot) => <button className="admin-rect" type="button" key={slot.key} onClick={() => setMealSlot(slot.key)}><span>{slot.label}</span></button>)}</div>}{filter === 'food' && mealSlot && <button className="secondary-button" type="button" onClick={() => setMealSlot(null)}>Retour</button>}<div className="catalog-grid">{filter === 'language' && (courses.filter((course) => languageFilter === 'Toutes' || course.language === languageFilter).length ? courses.filter((course) => languageFilter === 'Toutes' || course.language === languageFilter).map((course) => <button className="catalog-course" key={course.id} onClick={() => onSelectCourse({ id: course.id, category: 'language', title: course.title, language: course.language, description: course.summary, duration_minutes: null })}><span className="catalog-language">{course.language}</span><strong>{course.title}</strong><small>{course.week_number ? `Semaine ${course.week_number}` : 'Cours'}</small></button>) : <p className="muted">Aucun cours pour cette langue. Exécutez les migrations ou ajoutez le contenu.</p>)}{filter === 'fixed' && (fixedItems.length ? fixedItems.map((item) => <button className="catalog-course" key={item.id} onClick={() => onSelectCourse({ id: item.id, category: 'fixed', title: item.title, description: item.description, duration_minutes: item.duration_minutes })}><span className="catalog-language">Semaine {item.week_number}</span><strong>{item.title}</strong><small>Activité fixe</small></button>) : <p className="muted">Aucune activité fixe pour le moment.</p>)}{filter === 'sport' && ((sportFilter === '' || sportFilter === 'Musculation') ? sportPrograms.map((program) => <button className="catalog-course" key={program} onClick={() => onSelectCourse({ id: `program-${program}`, category: 'sport', title: program, description: 'Programme d’entraînement fourni dans Supports.', duration_minutes: 90 })}><span className="catalog-language">Musculation</span><strong>{program}</strong><small>Ouvrir le module sport</small></button>) : <p className="muted">Les modules {sportFilter.toLowerCase()} seront ajoutés dès que leurs programmes seront fournis.</p>)}{filter === 'food' && (visibleRecipes.length ? visibleRecipes.map((recipe) => <button className="catalog-course" key={recipe.id} onClick={() => onSelectCourse({ id: recipe.id, category: 'food', title: recipe.name, description: recipe.instructions, recipe_id: recipe.id, duration_minutes: null })}><span className="catalog-language">Recette</span><strong>{recipe.name}</strong><small>Voir ingrédients et préparation</small></button>) : <p className="muted">Exécutez la migration nutrition pour afficher les recettes.</p>)}</div></section>
-}
-
-function LanguageLesson({ course, resources, exercises, answers, setAnswers, validated, setValidated, onExerciseAdded }: { course: Course; resources: Resource[]; exercises: Exercise[]; answers: Record<string, string>; setAnswers: (value: Record<string, string>) => void; validated: Record<string, boolean>; setValidated: (value: Record<string, boolean>) => void; onExerciseAdded: (courseId: string) => void }) { return <div className="lesson-grid"><article className="lesson-card full-width"><p className="card-kicker">Cours complet · {course.level ?? 'Parcours'}</p><h3>{course.summary}</h3><p className="lesson-copy">{course.theory}</p><div className="examples">{course.examples.split('·').map((example) => <p key={example}>{example.trim()}</p>)}</div><div className="course-actions"><button className="lesson-action" onClick={() => window.speechSynthesis.speak(new SpeechSynthesisUtterance(course.examples))}><Volume2 size={16} /> Écouter les exemples</button>{course.source_document && <button className="lesson-action" onClick={() => window.open(course.source_document!, '_blank', 'noopener,noreferrer')}><ExternalLink size={16} /> Ouvrir le manuel complet</button>}</div>{resources.length > 0 && <div className="course-resources"><p className="card-kicker">Ressources complémentaires</p>{resources.map((resource) => <a className="resource-link" href={resource.url} target="_blank" rel="noreferrer" key={resource.id}><ExternalLink size={14} /> {resource.title}</a>)}</div>}</article>{exercises.length ? exercises.map((exercise, index) => <article className="exercise-card" key={exercise.id}><div className="exercise-heading"><span className="exercise-number">{String(index + 1).padStart(2, '0')}</span><div><p className="card-kicker">{exercise.exercise_type === 'oral' ? 'Exercice oral' : 'Exercice écrit'}</p><h3>{exercise.prompt}</h3></div></div>{exercise.exercise_type === 'oral' ? <div className="oral-controls"><button className="lesson-action" onClick={() => window.speechSynthesis.speak(new SpeechSynthesisUtterance(exercise.prompt))}><Volume2 size={16} /> Écouter</button><button className="lesson-action" onClick={() => setValidated({ ...validated, [exercise.id]: true })}><Mic size={16} /> J’ai répété</button></div> : <input value={answers[exercise.id] ?? ''} onChange={(event) => setAnswers({ ...answers, [exercise.id]: event.target.value })} placeholder="Votre réponse..." />}<button className="primary-button" onClick={() => setValidated({ ...validated, [exercise.id]: true })}>{validated[exercise.id] ? <><CheckCircle2 size={16} /> Correction affichée</> : 'Corriger'}</button>{validated[exercise.id] && <div className="correction"><strong>Correction</strong><p>{exercise.expected_answer || exercise.answer || 'Réponse attendue dans le cours.'}</p><small>{exercise.explanation || 'Relisez la règle du cours et vérifiez la place des mots.'}</small></div>}</article>) : <article className="exercise-card"><p className="card-kicker">Exercices</p><h3>Exercice personnalisé</h3><p>Écrivez trois phrases avec le vocabulaire et la règle présentés ci-dessus, puis utilisez la lecture audio pour vous entraîner.</p><input placeholder="Votre production..." /><button className="primary-button">Enregistrer ma réponse</button></article>}<MemberExerciseForm courseId={course.id} onAdded={onExerciseAdded} /></div> }
-function MemberExerciseForm({ courseId, onAdded }: { courseId: string; onAdded: (courseId: string) => void }) {
-  const [prompt, setPrompt] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [saving, setSaving] = useState(false)
-  async function submit(event: React.FormEvent) {
-    event.preventDefault()
-    if (!prompt.trim()) return
-    setSaving(true)
-    const userId = (await supabase.auth.getUser()).data.user?.id
-    if (userId) await supabase.from('language_exercises').insert({ course_id: courseId, prompt: prompt.trim(), answer: answer.trim(), expected_answer: answer.trim(), explanation: 'Exercice personnel ajouté par vous-même.', exercise_type: 'written', position: 999, origin: 'member', created_by: userId })
-    setPrompt(''); setAnswer(''); setSaving(false)
-    onAdded(courseId)
+      const schedule = await supabase
+        .from("weekly_schedule_items")
+        .select("id")
+        .eq("category", "sport")
+        .eq("title", activity.title)
+        .limit(1)
+        .maybeSingle();
+      if (!schedule.data?.id) return;
+      const workoutResult = await supabase
+        .from("workout_sessions")
+        .select(
+          "program, session_name, warmup, main_workout, cooldown, equipment",
+        )
+        .eq("schedule_item_id", schedule.data.id)
+        .maybeSingle();
+      setWorkout((workoutResult.data ?? null) as Workout | null);
+    })();
+  }, [activity]);
+  async function loadComments(targetType: string, targetId: string) {
+    const { data } = await supabase
+      .from("module_comments")
+      .select("id, message, created_at")
+      .eq("target_type", targetType)
+      .eq("target_id", targetId)
+      .order("created_at", { ascending: false });
+    setComments((data ?? []) as Comment[]);
   }
-  return <article className="exercise-card full-width"><p className="card-kicker">Mes exercices</p><h3>Ajouter mon propre exercice</h3><form onSubmit={(event) => void submit(event)} className="library-admin-form"><label>Consigne<textarea rows={2} value={prompt} onChange={(event) => setPrompt(event.target.value)} required /></label><label>Réponse attendue<input value={answer} onChange={(event) => setAnswer(event.target.value)} /></label><button className="primary-button" type="submit" disabled={saving}>Ajouter</button></form></article>
+  async function addComment(targetType: string, targetId: string) {
+    const message = comment.trim();
+    if (!message) return;
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (!userId) return;
+    await supabase
+      .from("module_comments")
+      .insert({
+        user_id: userId,
+        target_type: targetType,
+        target_id: targetId,
+        message,
+      });
+    setComment("");
+    await loadComments(targetType, targetId);
+  }
+  if (!activity) return <CourseCatalog onSelectCourse={onSelectCourse} />;
+  const label =
+    activity.category === "language"
+      ? "Cours de langue"
+      : activity.category === "sport"
+        ? "Programme d’entraînement"
+        : activity.category === "fixed"
+          ? "Activité fixe"
+          : "Recette et nutrition";
+  const targetType =
+    activity.category === "language"
+      ? "language_course"
+      : activity.category === "sport"
+        ? "workout_session"
+        : activity.category === "fixed"
+          ? "fixed_activity"
+          : "meal_recipe";
+  const targetId = course?.id ?? activity.recipe_id ?? activity.id;
+  return (
+    <section className="course-hub">
+      <CourseDataView data={course?.data ?? {}} />
+      <button className="back-link" onClick={onBack}>
+        <ArrowLeft size={16} /> Retour au planning
+      </button>
+      <div className="hub-hero">
+        <span className={`hub-icon ${activity.category}`}>
+          {activity.category === "language" ? (
+            <BookOpen />
+          ) : activity.category === "sport" ? (
+            <Dumbbell />
+          ) : activity.category === "fixed" ? (
+            <Pin />
+          ) : (
+            <Leaf />
+          )}
+        </span>
+        <div>
+          <p className="eyebrow">{label}</p>
+          <h2>{course?.title ?? activity.title}</h2>
+          {activity.duration_minutes && <p className="muted">{activity.duration_minutes} minutes</p>}
+          <MathContent value={activity.description} className="muted" />
+        </div>
+      </div>
+      {loading ? (
+        <p className="loading-state">Chargement du contenu complet...</p>
+      ) : activity.category === "language" && course ? (
+        <LanguageLesson
+          course={course}
+          resources={resources}
+          exercises={exercises}
+          answers={answers}
+          setAnswers={setAnswers}
+          validated={validated}
+          setValidated={setValidated}
+          onExerciseAdded={reloadExercises}
+        />
+      ) : activity.category === "sport" ? (
+        <SportLesson
+          activity={activity}
+          workout={workout}
+          validated={validated.activity ?? false}
+          setValidated={(value) => setValidated({ activity: value })}
+        />
+      ) : activity.category === "fixed" ? (
+        <article className="lesson-card full-width">
+          <h3>{activity.title}</h3>
+          <MathContent value={activity.description || "Activité personnelle sans contenu additionnel."} />
+        </article>
+      ) : (
+        <FoodLesson
+          activity={activity}
+          recipe={recipe}
+          validated={validated.activity ?? false}
+          setValidated={(value) => setValidated({ activity: value })}
+        />
+      )}
+      {
+        <Comments
+          comments={comments}
+          value={comment}
+          setValue={setComment}
+          onSubmit={() => void addComment(targetType, targetId)}
+        />
+      }
+    </section>
+  );
 }
-function SportLesson({ activity, workout, validated, setValidated }: { activity: Activity; workout: Workout | null; validated: boolean; setValidated: (value: boolean) => void }) { return <div className="lesson-grid"><article className="lesson-card full-width"><p className="card-kicker">Programme fourni · {workout?.program ?? 'Musculation'}</p><h3>{workout?.session_name ?? activity.title}</h3><p>{activity.description}</p><div className="workout-steps"><p><Clock3 size={16} /> Échauffement</p><p><Dumbbell size={16} /> Bloc principal</p><p><Leaf size={16} /> Retour au calme</p></div><h4>Déroulé</h4><p>{workout?.warmup}</p><p>{workout?.main_workout}</p><p>{workout?.cooldown}</p><p className="muted">Matériel : {workout?.equipment ?? 'Voir le fichier programme.'}</p></article><article className="exercise-card"><p className="card-kicker">Commentaires</p><h3>Notes de séance</h3><p>Ajoutez vos charges, répétitions, sensations ou adaptations dans l’espace commentaires ci-dessous.</p><button className="primary-button" onClick={() => setValidated(!validated)}>{validated ? 'Séance marquée comme terminée' : 'Marquer la séance terminée'}</button></article></div> }
-function FoodLesson({ activity, recipe, validated, setValidated }: { activity: Activity; recipe: Recipe | null; validated: boolean; setValidated: (value: boolean) => void }) { return <div className="lesson-grid"><article className="lesson-card full-width"><p className="card-kicker">Recette complète</p><h3>{recipe?.name ?? activity.title}</h3><p>{activity.description}</p><div className="recipe-meta"><span>Préparation · {recipe?.prep_minutes ?? '—'} min</span><span>Portions · {recipe?.servings ?? '—'}</span></div><h4>Ingrédients nécessaires</h4><ul className="lesson-list">{recipe?.ingredients.length ? recipe.ingredients.map((ingredient) => <li key={ingredient.name}>{ingredient.name} · {ingredient.quantity ?? ''} {ingredient.unit ?? ''}</li>) : <li>Consultez la liste de courses calculée.</li>}</ul><h4>Marche à suivre</h4><p>{recipe?.preparation_steps || recipe?.instructions || 'Suivez les étapes de la recette du planning repas.'}</p></article><article className="exercise-card"><p className="card-kicker">Suivi nutrition</p><h3>Repas préparé ?</h3><button className="primary-button" onClick={() => setValidated(!validated)}>{validated ? 'Repas validé' : 'Valider le repas'}</button></article></div> }
-function Comments({ comments, value, setValue, onSubmit }: { comments: Comment[]; value: string; setValue: (value: string) => void; onSubmit: () => void }) { return <section className="comments-panel"><p className="card-kicker">Commentaires personnels</p><div className="comment-form"><textarea value={value} onChange={(event) => setValue(event.target.value)} rows={3} placeholder="Ajoutez une note, une question ou une adaptation..." /><button className="primary-button" onClick={onSubmit}><Send size={15} /> Publier</button></div>{comments.map((comment) => <article className="comment-item" key={comment.id}><p>{comment.message}</p><small>{new Date(comment.created_at).toLocaleDateString('fr-FR')}</small></article>)}</section> }
+
+function CourseCatalog({
+  onSelectCourse,
+}: {
+  onSelectCourse: (activity: Activity) => void;
+}) {
+  const [courses, setCourses] = useState<
+    {
+      id: string;
+      language: string;
+      title: string;
+      summary: string;
+      week_number: number | null;
+    }[]
+  >([]);
+  const [recipes, setRecipes] = useState<
+    { id: string; name: string; instructions: string; meal_type: string }[]
+  >([]);
+  const [filter, setFilter] = useState<"language" | "sport" | "food" | "fixed">(
+    "language",
+  );
+  const [languageFilter, setLanguageFilter] = useState("Toutes");
+  const [sportFilter, setSportFilter] = useState("");
+  const [sportOptions, setSportOptions] = useState<string[]>([]);
+  const [mealSlot, setMealSlot] = useState<string | null>(null);
+  const [sportItems, setSportItems] = useState<
+    {
+      id: string;
+      title: string;
+      description: string;
+      duration_minutes: number | null;
+      week_number: number;
+    }[]
+  >([]);
+  const [fixedItems, setFixedItems] = useState<
+    {
+      id: string;
+      title: string;
+      description: string;
+      duration_minutes: number | null;
+      week_number: number;
+    }[]
+  >([]);
+  const sportPrograms = Array.from(
+    new Set(sportItems.map((item) => item.title)),
+  );
+  const mealSlots = [
+    { key: "breakfast", label: "Matin" },
+    { key: "lunch", label: "Midi" },
+    { key: "snack", label: "16h" },
+    { key: "dinner", label: "Soir" },
+  ];
+  useEffect(() => {
+    supabase
+      .from("language_courses")
+      .select("id, language, title, summary, week_number")
+      .order("language")
+      .order("course_number")
+      .then(({ data }) => setCourses(data ?? []));
+    supabase
+      .from("meal_recipes")
+      .select("id, name, instructions, meal_type")
+      .order("name")
+      .then(({ data }) =>
+        setRecipes(
+          (data ?? []) as {
+            id: string;
+            name: string;
+            instructions: string;
+            meal_type: string;
+          }[],
+        ),
+      );
+    supabase
+      .from("weekly_schedule_items")
+      .select("id, title, description, duration_minutes, week_number")
+      .eq("category", "sport")
+      .order("week_number")
+      .order("day_of_week")
+      .then(({ data }) =>
+        setSportItems(
+          (data ?? []) as {
+            id: string;
+            title: string;
+            description: string;
+            duration_minutes: number | null;
+            week_number: number;
+          }[],
+        ),
+      );
+    supabase
+      .from("weekly_schedule_items")
+      .select("id, title, description, duration_minutes, week_number")
+      .eq("category", "fixed")
+      .order("week_number")
+      .order("day_of_week")
+      .then(({ data }) =>
+        setFixedItems(
+          (data ?? []) as {
+            id: string;
+            title: string;
+            description: string;
+            duration_minutes: number | null;
+            week_number: number;
+          }[],
+        ),
+      );
+    supabase
+      .from("content_type_options")
+      .select("label")
+      .eq("kind", "sport")
+      .order("label")
+      .then(({ data }) =>
+        setSportOptions((data ?? []).map((row) => row.label as string)),
+      );
+  }, []);
+  const filterButtons = [
+    {
+      value: "language" as const,
+      label: "Langues",
+      caption: "Cours par langue et par semaine",
+    },
+    {
+      value: "sport" as const,
+      label: "Sport",
+      caption: "Programmes d’entraînement",
+    },
+    {
+      value: "food" as const,
+      label: "Nourriture",
+      caption: "Recettes et préparation",
+    },
+    {
+      value: "fixed" as const,
+      label: "Activités fixes",
+      caption: "Vos rendez-vous récurrents",
+    },
+  ];
+  const languagesInCourses = [
+    "Toutes",
+    ...Array.from(new Set(courses.map((course) => course.language))),
+  ];
+  const visibleRecipes = recipes.filter(
+    (recipe) => !mealSlot || recipe.meal_type === mealSlot,
+  );
+  return (
+    <section className="course-catalog">
+      <div className="section-intro">
+        <p className="eyebrow">Plan & Plate</p>
+        <h2>Votre bibliothèque de parcours.</h2>
+        <p className="muted">
+          Choisissez un domaine, puis une langue ou une discipline.
+        </p>
+      </div>
+      <div className="admin-card-grid">
+        {filterButtons.map((button) => (
+          <button
+            className={`admin-card ${filter === button.value ? "active" : ""}`}
+            key={button.value}
+            onClick={() => {
+              setFilter(button.value);
+              setMealSlot(null);
+            }}
+          >
+            <strong>{button.label}</strong>
+            <span>{button.caption}</span>
+          </button>
+        ))}
+      </div>
+      {filter === "language" && (
+        <label className="catalog-select">
+          <span>Langue</span>
+          <select
+            value={languageFilter}
+            onChange={(event) => setLanguageFilter(event.target.value)}
+          >
+            {languagesInCourses.map((language) => (
+              <option key={language}>{language}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {filter === "sport" && (
+        <label className="catalog-select">
+          <span>Discipline</span>
+          <select
+            value={sportFilter}
+            onChange={(event) => setSportFilter(event.target.value)}
+          >
+            <option value="">Toutes</option>
+            {sportOptions.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {filter === "food" && !mealSlot && (
+        <div className="admin-icon-grid">
+          {mealSlots.map((slot) => (
+            <button
+              className="admin-rect"
+              type="button"
+              key={slot.key}
+              onClick={() => setMealSlot(slot.key)}
+            >
+              <span>{slot.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {filter === "food" && mealSlot && (
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => setMealSlot(null)}
+        >
+          Retour
+        </button>
+      )}
+      <div className="catalog-grid">
+        {filter === "language" &&
+          (courses.filter(
+            (course) =>
+              languageFilter === "Toutes" || course.language === languageFilter,
+          ).length ? (
+            courses
+              .filter(
+                (course) =>
+                  languageFilter === "Toutes" ||
+                  course.language === languageFilter,
+              )
+              .map((course) => (
+                <button
+                  className="catalog-course"
+                  key={course.id}
+                  onClick={() =>
+                    onSelectCourse({
+                      id: course.id,
+                      category: "language",
+                      title: course.title,
+                      language: course.language,
+                      description: course.summary,
+                      duration_minutes: null,
+                    })
+                  }
+                >
+                  <span className="catalog-language">{course.language}</span>
+                  <strong>{course.title}</strong>
+                  <small>
+                    {course.week_number
+                      ? `Semaine ${course.week_number}`
+                      : "Cours"}
+                  </small>
+                </button>
+              ))
+          ) : (
+            <p className="muted">
+              Aucun cours pour cette langue. Exécutez les migrations ou ajoutez
+              le contenu.
+            </p>
+          ))}
+        {filter === "fixed" &&
+          (fixedItems.length ? (
+            fixedItems.map((item) => (
+              <button
+                className="catalog-course"
+                key={item.id}
+                onClick={() =>
+                  onSelectCourse({
+                    id: item.id,
+                    category: "fixed",
+                    title: item.title,
+                    description: item.description,
+                    duration_minutes: item.duration_minutes,
+                  })
+                }
+              >
+                <span className="catalog-language">
+                  Semaine {item.week_number}
+                </span>
+                <strong>{item.title}</strong>
+                <small>Activité fixe</small>
+              </button>
+            ))
+          ) : (
+            <p className="muted">Aucune activité fixe pour le moment.</p>
+          ))}
+        {filter === "sport" &&
+          (sportFilter === "" || sportFilter === "Musculation" ? (
+            sportPrograms.map((program) => (
+              <button
+                className="catalog-course"
+                key={program}
+                onClick={() =>
+                  onSelectCourse({
+                    id: `program-${program}`,
+                    category: "sport",
+                    title: program,
+                    description:
+                      "Programme d’entraînement fourni dans Supports.",
+                    duration_minutes: 90,
+                  })
+                }
+              >
+                <span className="catalog-language">Musculation</span>
+                <strong>{program}</strong>
+                <small>Ouvrir le module sport</small>
+              </button>
+            ))
+          ) : (
+            <p className="muted">
+              Les modules {sportFilter.toLowerCase()} seront ajoutés dès que
+              leurs programmes seront fournis.
+            </p>
+          ))}
+        {filter === "food" &&
+          (visibleRecipes.length ? (
+            visibleRecipes.map((recipe) => (
+              <button
+                className="catalog-course"
+                key={recipe.id}
+                onClick={() =>
+                  onSelectCourse({
+                    id: recipe.id,
+                    category: "food",
+                    title: recipe.name,
+                    description: recipe.instructions,
+                    recipe_id: recipe.id,
+                    duration_minutes: null,
+                  })
+                }
+              >
+                <span className="catalog-language">Recette</span>
+                <strong>{recipe.name}</strong>
+                <small>Voir ingrédients et préparation</small>
+              </button>
+            ))
+          ) : (
+            <p className="muted">
+              Exécutez la migration nutrition pour afficher les recettes.
+            </p>
+          ))}
+      </div>
+    </section>
+  );
+}
+
+function LanguageLesson({
+  course,
+  resources,
+  exercises,
+  answers,
+  setAnswers,
+  validated,
+  setValidated,
+  onExerciseAdded,
+}: {
+  course: Course;
+  resources: Resource[];
+  exercises: Exercise[];
+  answers: Record<string, string>;
+  setAnswers: (value: Record<string, string>) => void;
+  validated: Record<string, boolean>;
+  setValidated: (value: Record<string, boolean>) => void;
+  onExerciseAdded: (courseId: string) => void;
+}) {
+  return (
+    <div className="lesson-grid">
+      <article className="lesson-card full-width">
+        <p className="card-kicker">
+          Cours complet · {course.level ?? "Parcours"}
+        </p>
+        <MathContent value={course.summary} className="lesson-summary" />
+        <MathContent value={course.theory} className="lesson-copy" />
+        <div className="examples">
+          {course.examples.split("·").map((example) => (
+            <MathContent value={example.trim()} key={example} />
+          ))}
+        </div>
+        <div className="course-actions">
+          <button
+            className="lesson-action"
+            onClick={() =>
+              window.speechSynthesis.speak(
+                new SpeechSynthesisUtterance(course.examples),
+              )
+            }
+          >
+            <Volume2 size={16} /> Écouter les exemples
+          </button>
+          {course.source_document && (
+            <button
+              className="lesson-action"
+              onClick={() =>
+                window.open(
+                  course.source_document!,
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+            >
+              <ExternalLink size={16} /> Ouvrir le manuel complet
+            </button>
+          )}
+        </div>
+        {resources.length > 0 && (
+          <div className="course-resources">
+            <p className="card-kicker">Ressources complémentaires</p>
+            {resources.map((resource) => (
+              <a
+                className="resource-link"
+                href={resource.url}
+                target="_blank"
+                rel="noreferrer"
+                key={resource.id}
+              >
+                <ExternalLink size={14} /> {resource.title}
+              </a>
+            ))}
+          </div>
+        )}
+      </article>
+      {exercises.length ? (
+        exercises.map((exercise, index) => (
+          <article className="exercise-card" key={exercise.id}>
+            <div className="exercise-heading">
+              <span className="exercise-number">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <p className="card-kicker">
+                  {exercise.exercise_type === "oral"
+                    ? "Exercice oral"
+                    : "Exercice écrit"}
+                </p>
+                <h3>{exercise.prompt}</h3>
+              </div>
+            </div>
+            {exercise.exercise_type === "oral" ? (
+              <div className="oral-controls">
+                <button
+                  className="lesson-action"
+                  onClick={() =>
+                    window.speechSynthesis.speak(
+                      new SpeechSynthesisUtterance(exercise.prompt),
+                    )
+                  }
+                >
+                  <Volume2 size={16} /> Écouter
+                </button>
+                <button
+                  className="lesson-action"
+                  onClick={() =>
+                    setValidated({ ...validated, [exercise.id]: true })
+                  }
+                >
+                  <Mic size={16} /> J’ai répété
+                </button>
+              </div>
+            ) : (
+              <input
+                value={answers[exercise.id] ?? ""}
+                onChange={(event) =>
+                  setAnswers({ ...answers, [exercise.id]: event.target.value })
+                }
+                placeholder="Votre réponse..."
+              />
+            )}
+            <button
+              className="primary-button"
+              onClick={() =>
+                setValidated({ ...validated, [exercise.id]: true })
+              }
+            >
+              {validated[exercise.id] ? (
+                <>
+                  <CheckCircle2 size={16} /> Correction affichée
+                </>
+              ) : (
+                "Corriger"
+              )}
+            </button>
+            {validated[exercise.id] && (
+              <div className="correction">
+                <strong>Correction</strong>
+                <p>
+                  {exercise.expected_answer ||
+                    exercise.answer ||
+                    "Réponse attendue dans le cours."}
+                </p>
+                <small>
+                  {exercise.explanation ||
+                    "Relisez la règle du cours et vérifiez la place des mots."}
+                </small>
+              </div>
+            )}
+          </article>
+        ))
+      ) : (
+        <article className="exercise-card">
+          <p className="card-kicker">Exercices</p>
+          <h3>Exercice personnalisé</h3>
+          <p>
+            Écrivez trois phrases avec le vocabulaire et la règle présentés
+            ci-dessus, puis utilisez la lecture audio pour vous entraîner.
+          </p>
+          <input placeholder="Votre production..." />
+          <button className="primary-button">Enregistrer ma réponse</button>
+        </article>
+      )}
+      <MemberExerciseForm courseId={course.id} onAdded={onExerciseAdded} />
+    </div>
+  );
+}
+function MemberExerciseForm({
+  courseId,
+  onAdded,
+}: {
+  courseId: string;
+  onAdded: (courseId: string) => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [saving, setSaving] = useState(false);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!prompt.trim()) return;
+    setSaving(true);
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (userId)
+      await supabase
+        .from("language_exercises")
+        .insert({
+          course_id: courseId,
+          prompt: prompt.trim(),
+          answer: answer.trim(),
+          expected_answer: answer.trim(),
+          explanation: "Exercice personnel ajouté par vous-même.",
+          exercise_type: "written",
+          position: 999,
+          origin: "member",
+          created_by: userId,
+        });
+    setPrompt("");
+    setAnswer("");
+    setSaving(false);
+    onAdded(courseId);
+  }
+  return (
+    <article className="exercise-card full-width">
+      <p className="card-kicker">Mes exercices</p>
+      <h3>Ajouter mon propre exercice</h3>
+      <form
+        onSubmit={(event) => void submit(event)}
+        className="library-admin-form"
+      >
+        <label>
+          Consigne
+          <textarea
+            rows={2}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Réponse attendue
+          <input
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+          />
+        </label>
+        <button className="primary-button" type="submit" disabled={saving}>
+          Ajouter
+        </button>
+      </form>
+    </article>
+  );
+}
+function SportLesson({
+  activity,
+  workout,
+  validated,
+  setValidated,
+}: {
+  activity: Activity;
+  workout: Workout | null;
+  validated: boolean;
+  setValidated: (value: boolean) => void;
+}) {
+  return (
+    <div className="lesson-grid">
+      <article className="lesson-card full-width">
+        <p className="card-kicker">
+          Programme fourni · {workout?.program ?? "Musculation"}
+        </p>
+        <h3>{workout?.session_name ?? activity.title}</h3>
+        <MathContent value={activity.description} />
+        <div className="workout-steps">
+          <p>
+            <Clock3 size={16} /> Échauffement
+          </p>
+          <p>
+            <Dumbbell size={16} /> Bloc principal
+          </p>
+          <p>
+            <Leaf size={16} /> Retour au calme
+          </p>
+        </div>
+        <h4>Déroulé</h4>
+        <MathContent value={workout?.warmup ?? ""} />
+        <MathContent value={workout?.main_workout ?? ""} />
+        <MathContent value={workout?.cooldown ?? ""} />
+        <p className="muted">
+          Matériel : {workout?.equipment ?? "Voir le fichier programme."}
+        </p>
+      </article>
+      <article className="exercise-card">
+        <p className="card-kicker">Commentaires</p>
+        <h3>Notes de séance</h3>
+        <p>
+          Ajoutez vos charges, répétitions, sensations ou adaptations dans
+          l’espace commentaires ci-dessous.
+        </p>
+        <button
+          className="primary-button"
+          onClick={() => setValidated(!validated)}
+        >
+          {validated
+            ? "Séance marquée comme terminée"
+            : "Marquer la séance terminée"}
+        </button>
+      </article>
+    </div>
+  );
+}
+function FoodLesson({
+  activity,
+  recipe,
+  validated,
+  setValidated,
+}: {
+  activity: Activity;
+  recipe: Recipe | null;
+  validated: boolean;
+  setValidated: (value: boolean) => void;
+}) {
+  return (
+    <div className="lesson-grid">
+      <article className="lesson-card full-width">
+        <p className="card-kicker">Recette complète</p>
+        <h3>{recipe?.name ?? activity.title}</h3>
+        <MathContent value={activity.description} />
+        <div className="recipe-meta">
+          <span>Préparation · {recipe?.prep_minutes ?? "—"} min</span>
+          <span>Portions · {recipe?.servings ?? "—"}</span>
+        </div>
+        <h4>Ingrédients nécessaires</h4>
+        <ul className="lesson-list">
+          {recipe?.ingredients.length ? (
+            recipe.ingredients.map((ingredient) => (
+              <li key={ingredient.name}>
+                {ingredient.name} · {ingredient.quantity ?? ""}{" "}
+                {ingredient.unit ?? ""}
+              </li>
+            ))
+          ) : (
+            <li>Consultez la liste de courses calculée.</li>
+          )}
+        </ul>
+        <h4>Marche à suivre</h4>
+        <MathContent value={recipe?.preparation_steps || recipe?.instructions || "Suivez les étapes de la recette du planning repas."} />
+      </article>
+      <article className="exercise-card">
+        <p className="card-kicker">Suivi nutrition</p>
+        <h3>Repas préparé ?</h3>
+        <button
+          className="primary-button"
+          onClick={() => setValidated(!validated)}
+        >
+          {validated ? "Repas validé" : "Valider le repas"}
+        </button>
+      </article>
+    </div>
+  );
+}
+function Comments({
+  comments,
+  value,
+  setValue,
+  onSubmit,
+}: {
+  comments: Comment[];
+  value: string;
+  setValue: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section className="comments-panel">
+      <p className="card-kicker">Commentaires personnels</p>
+      <div className="comment-form">
+        <textarea
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          rows={3}
+          placeholder="Ajoutez une note, une question ou une adaptation..."
+        />
+        <button className="primary-button" onClick={onSubmit}>
+          <Send size={15} /> Publier
+        </button>
+      </div>
+      {comments.map((comment) => (
+        <article className="comment-item" key={comment.id}>
+          <p>{comment.message}</p>
+          <small>
+            {new Date(comment.created_at).toLocaleDateString("fr-FR")}
+          </small>
+        </article>
+      ))}
+    </section>
+  );
+}

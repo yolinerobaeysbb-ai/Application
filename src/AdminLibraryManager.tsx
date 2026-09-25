@@ -1,44 +1,464 @@
-import { useEffect, useState } from 'react'
-import { PencilLine, Plus, Trash2 } from 'lucide-react'
-import { supabase } from './lib/supabase'
-import { trashDelete } from './lib/trash'
+import { useEffect, useState } from "react";
+import { PencilLine, Plus, Trash2 } from "lucide-react";
+import { supabase } from "./lib/supabase";
+import { trashDelete } from "./lib/trash";
+import MathField from './MathField';
+import "./math.css";
 
-type Course = { id: string; language: string; title: string; level: string | null; course_number: number; week_number: number | null; summary: string; theory: string; examples: string; source_document: string | null }
-type Recipe = { id: string; name: string; meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack'; prep_minutes: number | null; servings: number; instructions: string; preparation_steps: string; photo_url: string | null }
-type Mode = 'course' | 'recipe'
-const languages = ['Allemand', 'Coréen', 'Espagnol', 'Italien', 'Japonais', 'Néerlandais', 'Thaï']
-const emptyCourse: Omit<Course, 'id'> = { language: languages[0], title: '', level: '', course_number: 1, week_number: 1, summary: '', theory: '', examples: '', source_document: '' }
-const emptyRecipe: Omit<Recipe, 'id'> = { name: '', meal_type: 'dinner', prep_minutes: 30, servings: 1, instructions: '', preparation_steps: '', photo_url: null }
+type Course = {
+  id: string;
+  language: string;
+  title: string;
+  level: string | null;
+  course_number: number;
+  week_number: number | null;
+  summary: string;
+  theory: string;
+  examples: string;
+  source_document: string | null;
+};
+type Recipe = {
+  id: string;
+  name: string;
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+  prep_minutes: number | null;
+  servings: number;
+  instructions: string;
+  preparation_steps: string;
+  photo_url: string | null;
+};
+type Mode = "course" | "recipe";
+const languages = [
+  "Allemand",
+  "Coréen",
+  "Espagnol",
+  "Italien",
+  "Japonais",
+  "Néerlandais",
+  "Thaï",
+];
+const emptyCourse: Omit<Course, "id"> = { language: languages[0], title: "", level: "", course_number: 1, week_number: 1, summary: "", theory: "", examples: "", source_document: "" };
+const emptyRecipe: Omit<Recipe, "id"> = { name: "", meal_type: "dinner", prep_minutes: 30, servings: 1, instructions: "", preparation_steps: "", photo_url: null };
 
-export default function AdminLibraryManager({ languageFilter, mealTypeFilter, lockMode }: { languageFilter?: string; mealTypeFilter?: Recipe['meal_type']; lockMode?: Mode } = {}) {
-  const [mode, setMode] = useState<Mode>(lockMode ?? (mealTypeFilter ? 'recipe' : 'course'))
-  const [courses, setCourses] = useState<Course[]>([])
-  const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [courseForm, setCourseForm] = useState<Omit<Course, 'id'>>({ ...emptyCourse, language: languageFilter ?? emptyCourse.language })
-  const [recipeForm, setRecipeForm] = useState<Omit<Recipe, 'id'>>({ ...emptyRecipe, meal_type: mealTypeFilter ?? emptyRecipe.meal_type })
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [message, setMessage] = useState('')
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+export default function AdminLibraryManager({
+  languageFilter,
+  mealTypeFilter,
+  lockMode,
+}: {
+  languageFilter?: string;
+  mealTypeFilter?: Recipe["meal_type"];
+  lockMode?: Mode;
+} = {}) {
+  const [mode, setMode] = useState<Mode>(
+    lockMode ?? (mealTypeFilter ? "recipe" : "course"),
+  );
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [courseForm, setCourseForm] = useState<Omit<Course, "id">>({
+    ...emptyCourse,
+    language: languageFilter ?? emptyCourse.language,
+  });
+  const [recipeForm, setRecipeForm] = useState<Omit<Recipe, "id">>({
+    ...emptyRecipe,
+    meal_type: mealTypeFilter ?? emptyRecipe.meal_type,
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   async function load() {
-    let courseQuery = supabase.from('language_courses').select('id, language, title, level, course_number, week_number, summary, theory, examples, source_document').order('language').order('course_number')
-    if (languageFilter) courseQuery = courseQuery.eq('language', languageFilter)
-    let recipeQuery = supabase.from('meal_recipes').select('id, name, meal_type, prep_minutes, servings, instructions, preparation_steps, photo_url').order('name')
-    if (mealTypeFilter) recipeQuery = recipeQuery.eq('meal_type', mealTypeFilter)
-    const [courseResult, recipeResult] = await Promise.all([courseQuery, recipeQuery])
-    setCourses((courseResult.data ?? []) as Course[])
-    setRecipes((recipeResult.data ?? []) as Recipe[])
+    let courseQuery = supabase
+      .from("language_courses")
+      .select(
+        "id, language, title, level, course_number, week_number, summary, theory, examples, source_document",
+      )
+      .order("language")
+      .order("course_number");
+    if (languageFilter)
+      courseQuery = courseQuery.eq("language", languageFilter);
+    let recipeQuery = supabase
+      .from("meal_recipes")
+      .select(
+        "id, name, meal_type, prep_minutes, servings, instructions, preparation_steps, photo_url",
+      )
+      .order("name");
+    if (mealTypeFilter)
+      recipeQuery = recipeQuery.eq("meal_type", mealTypeFilter);
+    const [courseResult, recipeResult] = await Promise.all([
+      courseQuery,
+      recipeQuery,
+    ]);
+    setCourses((courseResult.data ?? []) as Course[]);
+    setRecipes((recipeResult.data ?? []) as Recipe[]);
   }
-  useEffect(() => { void load() }, [languageFilter, mealTypeFilter])
-  function reset() { setEditingId(null); setCourseForm({ ...emptyCourse, language: languageFilter ?? emptyCourse.language }); setRecipeForm({ ...emptyRecipe, meal_type: mealTypeFilter ?? emptyRecipe.meal_type }); setMessage('') }
-  async function uploadRecipePhoto(file: File) { setUploadingPhoto(true); const path = `recipes/${crypto.randomUUID()}-${file.name}`; const upload = await supabase.storage.from('phoenix-documents').upload(path, file, { upsert: false }); if (upload.error) { setMessage('Impossible d’envoyer la photo.'); setUploadingPhoto(false); return }; const { data } = supabase.storage.from('phoenix-documents').getPublicUrl(path); setRecipe('photo_url', data.publicUrl); setUploadingPhoto(false) }
-  function editCourse(course: Course) { setMode('course'); setOpen(true); setEditingId(course.id); setCourseForm({ ...course, level: course.level ?? '', source_document: course.source_document ?? '' }); setMessage('') }
-  function editRecipe(recipe: Recipe) { setMode('recipe'); setOpen(true); setEditingId(recipe.id); setRecipeForm({ ...recipe, prep_minutes: recipe.prep_minutes ?? 0, preparation_steps: recipe.preparation_steps ?? '' }); setMessage('') }
-  async function saveCourse(event: React.FormEvent) { event.preventDefault(); const payload = { ...courseForm, level: courseForm.level || null, source_document: courseForm.source_document || null, course_number: Number(courseForm.course_number), week_number: courseForm.week_number ? Number(courseForm.week_number) : null }; const result = editingId ? await supabase.from('language_courses').update(payload).eq('id', editingId) : await supabase.from('language_courses').insert(payload); if (result.error) { setMessage(result.error.message); return }; reset(); await load() }
-  async function saveRecipe(event: React.FormEvent) { event.preventDefault(); const payload = { ...recipeForm, prep_minutes: recipeForm.prep_minutes ? Number(recipeForm.prep_minutes) : null, servings: Number(recipeForm.servings) || 1 }; const result = editingId ? await supabase.from('meal_recipes').update(payload).eq('id', editingId) : await supabase.from('meal_recipes').insert(payload); if (result.error) { setMessage(result.error.message); return }; reset(); await load() }
-  async function remove(kind: Mode, id: string) { const row = kind === 'course' ? courses.find((item) => item.id === id) : recipes.find((item) => item.id === id); if (!row) return; const table = kind === 'course' ? 'language_courses' : 'meal_recipes'; const { error } = await trashDelete(table, row); if (error) { setMessage(error); return }; await load() }
-  const setCourse = (key: keyof Omit<Course, 'id'>, value: string | number | null) => setCourseForm((current) => ({ ...current, [key]: value }))
-  const setRecipe = (key: keyof Omit<Recipe, 'id'>, value: string | number | null) => setRecipeForm((current) => ({ ...current, [key]: value }))
-  return <section className="library-admin"><div className="library-admin-heading"><div><p className="card-kicker">Administration</p><h3>Gérer les contenus</h3><p className="muted">Ajoute, modifie ou supprime les cours et les recettes affichés dans Plan & Plate.</p></div><button className="primary-button" type="button" onClick={() => { reset(); setOpen(true) }}><Plus size={15} /> Ajouter</button></div>{!lockMode && <div className="library-admin-tabs"><button className={mode === 'course' ? 'active' : ''} onClick={() => setMode('course')}>Cours</button><button className={mode === 'recipe' ? 'active' : ''} onClick={() => setMode('recipe')}>Recettes / nourriture</button></div>}{open && <form className="library-admin-form" onSubmit={(event) => void (mode === 'course' ? saveCourse(event) : saveRecipe(event))}>{mode === 'course' ? <><label>Langue<select value={courseForm.language} onChange={(event) => setCourse('language', event.target.value)}>{languages.map((language) => <option key={language}>{language}</option>)}</select></label><label>Titre<input value={courseForm.title} onChange={(event) => setCourse('title', event.target.value)} required /></label><div className="library-form-grid"><label>N° du cours<input type="number" min={1} value={courseForm.course_number} onChange={(event) => setCourse('course_number', Number(event.target.value))} /></label><label>Semaine<input type="number" min={1} max={16} value={courseForm.week_number ?? ''} onChange={(event) => setCourse('week_number', event.target.value ? Number(event.target.value) : null)} /></label><label>Niveau<input value={courseForm.level ?? ''} onChange={(event) => setCourse('level', event.target.value)} /></label></div><label>Résumé<input value={courseForm.summary} onChange={(event) => setCourse('summary', event.target.value)} /></label><label>Théorie<textarea rows={5} value={courseForm.theory} onChange={(event) => setCourse('theory', event.target.value)} /></label><label>Exemples<textarea rows={4} value={courseForm.examples} onChange={(event) => setCourse('examples', event.target.value)} /></label><label>Document source<input value={courseForm.source_document ?? ''} onChange={(event) => setCourse('source_document', event.target.value)} placeholder="/documents/Allemand.pdf" /></label></> : <><label>Nom de la recette<input value={recipeForm.name} onChange={(event) => setRecipe('name', event.target.value)} required /></label><label>Photo du plat<input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadRecipePhoto(file) }} disabled={uploadingPhoto} />{recipeForm.photo_url && <img src={recipeForm.photo_url} alt="Aperçu du plat" className="recipe-photo-preview" />}</label><div className="library-form-grid"><label>Type<select value={recipeForm.meal_type} onChange={(event) => setRecipe('meal_type', event.target.value)}><option value="breakfast">Petit-déjeuner</option><option value="lunch">Déjeuner</option><option value="dinner">Dîner</option><option value="snack">Collation</option></select></label><label>Préparation (min)<input type="number" min={1} value={recipeForm.prep_minutes ?? ''} onChange={(event) => setRecipe('prep_minutes', Number(event.target.value))} /></label><label>Portions<input type="number" min={1} value={recipeForm.servings} onChange={(event) => setRecipe('servings', Number(event.target.value))} /></label></div><label>Ingrédients / instructions<textarea rows={5} value={recipeForm.instructions} onChange={(event) => setRecipe('instructions', event.target.value)} /></label><label>Étapes détaillées<textarea rows={5} value={recipeForm.preparation_steps} onChange={(event) => setRecipe('preparation_steps', event.target.value)} /></label></>}{message && <p className="form-error">{message}</p>}<div className="recap-actions"><button className="primary-button" type="submit">{editingId ? 'Mettre à jour' : 'Enregistrer'}</button><button className="secondary-button" type="button" onClick={() => { reset(); setOpen(false) }}>Annuler</button></div></form>}<div className="library-admin-list">{(mode === 'course' ? courses : recipes).map((item) => <div className="library-admin-row" key={item.id}><div><strong>{mode === 'course' ? `${(item as Course).language} · ${(item as Course).title}` : (item as Recipe).name}</strong><small>{mode === 'course' ? `Semaine ${(item as Course).week_number ?? '—'} · Cours ${(item as Course).course_number}` : `${(item as Recipe).meal_type} · ${(item as Recipe).prep_minutes ?? '—'} min`}</small></div><button className="inline-action" type="button" onClick={() => mode === 'course' ? editCourse(item as Course) : editRecipe(item as Recipe)}><PencilLine size={14} /> Modifier</button><button className="inline-action danger" type="button" onClick={() => void remove(mode, item.id)}><Trash2 size={14} /> Supprimer</button></div>)}</div></section>
+  useEffect(() => {
+    void load();
+  }, [languageFilter, mealTypeFilter]);
+  function reset() {
+    setEditingId(null);
+    setCourseForm({
+      ...emptyCourse,
+      language: languageFilter ?? emptyCourse.language,
+    });
+    setRecipeForm({
+      ...emptyRecipe,
+      meal_type: mealTypeFilter ?? emptyRecipe.meal_type,
+    });
+    setMessage("");
+  }
+  async function uploadRecipePhoto(file: File) {
+    setUploadingPhoto(true);
+    const path = `recipes/${crypto.randomUUID()}-${file.name}`;
+    const upload = await supabase.storage
+      .from("phoenix-documents")
+      .upload(path, file, { upsert: false });
+    if (upload.error) {
+      setMessage("Impossible d’envoyer la photo.");
+      setUploadingPhoto(false);
+      return;
+    }
+    const { data } = supabase.storage
+      .from("phoenix-documents")
+      .getPublicUrl(path);
+    setRecipe("photo_url", data.publicUrl);
+    setUploadingPhoto(false);
+  }
+  function editCourse(course: Course) {
+    setMode("course");
+    setOpen(true);
+    setEditingId(course.id);
+    setCourseForm({
+      ...course,
+      level: course.level ?? "",
+      source_document: course.source_document ?? "",
+    });
+    setMessage("");
+  }
+  function editRecipe(recipe: Recipe) {
+    setMode("recipe");
+    setOpen(true);
+    setEditingId(recipe.id);
+    setRecipeForm({
+      ...recipe,
+      prep_minutes: recipe.prep_minutes ?? 0,
+      preparation_steps: recipe.preparation_steps ?? "",
+    });
+    setMessage("");
+  }
+  async function saveCourse(event: React.FormEvent) {
+    event.preventDefault();
+    const payload = {
+      ...courseForm,
+      level: courseForm.level || null,
+      source_document: courseForm.source_document || null,
+      course_number: Number(courseForm.course_number),
+      week_number: courseForm.week_number
+        ? Number(courseForm.week_number)
+        : null,
+    };
+    const result = editingId
+      ? await supabase
+          .from("language_courses")
+          .update(payload)
+          .eq("id", editingId)
+      : await supabase.from("language_courses").insert(payload);
+    if (result.error) {
+      setMessage(result.error.message);
+      return;
+    }
+    reset();
+    await load();
+  }
+  async function saveRecipe(event: React.FormEvent) {
+    event.preventDefault();
+    const payload = {
+      ...recipeForm,
+      prep_minutes: recipeForm.prep_minutes
+        ? Number(recipeForm.prep_minutes)
+        : null,
+      servings: Number(recipeForm.servings) || 1,
+    };
+    const result = editingId
+      ? await supabase.from("meal_recipes").update(payload).eq("id", editingId)
+      : await supabase.from("meal_recipes").insert(payload);
+    if (result.error) {
+      setMessage(result.error.message);
+      return;
+    }
+    reset();
+    await load();
+  }
+  async function remove(kind: Mode, id: string) {
+    const row =
+      kind === "course"
+        ? courses.find((item) => item.id === id)
+        : recipes.find((item) => item.id === id);
+    if (!row) return;
+    const table = kind === "course" ? "language_courses" : "meal_recipes";
+    const { error } = await trashDelete(table, row);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+    await load();
+  }
+  const setCourse = (
+    key: keyof Omit<Course, "id">,
+    value: string | number | null,
+  ) => setCourseForm((current) => ({ ...current, [key]: value }));
+  const setRecipe = (
+    key: keyof Omit<Recipe, "id">,
+    value: string | number | null,
+  ) => setRecipeForm((current) => ({ ...current, [key]: value }));
+  return (
+    <section className="library-admin">
+      <div className="library-admin-heading">
+        <div>
+          <p className="card-kicker">Administration</p>
+          <h3>Gérer les contenus</h3>
+          <p className="muted">
+            Ajoute, modifie ou supprime les cours et les recettes affichés dans
+            Plan & Plate.
+          </p>
+        </div>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(true);
+          }}
+        >
+          <Plus size={15} /> Ajouter
+        </button>
+      </div>
+      {!lockMode && (
+        <div className="library-admin-tabs">
+          <button
+            className={mode === "course" ? "active" : ""}
+            onClick={() => setMode("course")}
+          >
+            Cours
+          </button>
+          <button
+            className={mode === "recipe" ? "active" : ""}
+            onClick={() => setMode("recipe")}
+          >
+            Recettes / nourriture
+          </button>
+        </div>
+      )}
+      {open && (
+        <form
+          className="library-admin-form"
+          onSubmit={(event) =>
+            void (mode === "course" ? saveCourse(event) : saveRecipe(event))
+          }
+        >
+          {mode === "course" ? (
+            <>
+              <label>
+                Langue
+                <select
+                  value={courseForm.language}
+                  onChange={(event) =>
+                    setCourse("language", event.target.value)
+                  }
+                >
+                  {languages.map((language) => (
+                    <option key={language}>{language}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Titre
+                <input
+                  value={courseForm.title}
+                  onChange={(event) => setCourse("title", event.target.value)}
+                  required
+                />
+              </label>
+              <div className="library-form-grid">
+                <label>
+                  N° du cours
+                  <input
+                    type="number"
+                    min={1}
+                    value={courseForm.course_number}
+                    onChange={(event) =>
+                      setCourse("course_number", Number(event.target.value))
+                    }
+                  />
+                </label>
+                <label>
+                  Semaine
+                  <input
+                    type="number"
+                    min={1}
+                    max={16}
+                    value={courseForm.week_number ?? ""}
+                    onChange={(event) =>
+                      setCourse(
+                        "week_number",
+                        event.target.value ? Number(event.target.value) : null,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Niveau
+                  <input
+                    value={courseForm.level ?? ""}
+                    onChange={(event) => setCourse("level", event.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                Résumé
+                <input
+                  value={courseForm.summary}
+                  onChange={(event) => setCourse("summary", event.target.value)}
+                />
+              </label>
+              <MathField label="Théorie (LaTeX possible)" value={courseForm.theory} onChange={(value) => setCourse("theory", value)} rows={5} />
+              <MathField label="Exemples (LaTeX possible)" value={courseForm.examples} onChange={(value) => setCourse("examples", value)} rows={4} />
+              <label>
+                Document source
+                <input
+                  value={courseForm.source_document ?? ""}
+                  onChange={(event) =>
+                    setCourse("source_document", event.target.value)
+                  }
+                  placeholder="/documents/Allemand.pdf"
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label>
+                Nom de la recette
+                <input
+                  value={recipeForm.name}
+                  onChange={(event) => setRecipe("name", event.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Photo du plat
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void uploadRecipePhoto(file);
+                  }}
+                  disabled={uploadingPhoto}
+                />
+                {recipeForm.photo_url && (
+                  <img
+                    src={recipeForm.photo_url}
+                    alt="Aperçu du plat"
+                    className="recipe-photo-preview"
+                  />
+                )}
+              </label>
+              <div className="library-form-grid">
+                <label>
+                  Type
+                  <select
+                    value={recipeForm.meal_type}
+                    onChange={(event) =>
+                      setRecipe("meal_type", event.target.value)
+                    }
+                  >
+                    <option value="breakfast">Petit-déjeuner</option>
+                    <option value="lunch">Déjeuner</option>
+                    <option value="dinner">Dîner</option>
+                    <option value="snack">Collation</option>
+                  </select>
+                </label>
+                <label>
+                  Préparation (min)
+                  <input
+                    type="number"
+                    min={1}
+                    value={recipeForm.prep_minutes ?? ""}
+                    onChange={(event) =>
+                      setRecipe("prep_minutes", Number(event.target.value))
+                    }
+                  />
+                </label>
+                <label>
+                  Portions
+                  <input
+                    type="number"
+                    min={1}
+                    value={recipeForm.servings}
+                    onChange={(event) =>
+                      setRecipe("servings", Number(event.target.value))
+                    }
+                  />
+                </label>
+              </div>
+              <MathField label="Ingrédients / instructions (LaTeX possible)" value={recipeForm.instructions} onChange={(value) => setRecipe("instructions", value)} rows={5} />
+              <MathField label="Étapes détaillées (LaTeX possible)" value={recipeForm.preparation_steps} onChange={(value) => setRecipe("preparation_steps", value)} rows={5} />
+            </>
+          )}
+          {message && <p className="form-error">{message}</p>}
+          <div className="recap-actions">
+            <button className="primary-button" type="submit">
+              {editingId ? "Mettre à jour" : "Enregistrer"}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                reset();
+                setOpen(false);
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
+      <div className="library-admin-list">
+        {(mode === "course" ? courses : recipes).map((item) => (
+          <div className="library-admin-row" key={item.id}>
+            <div>
+              <strong>
+                {mode === "course"
+                  ? `${(item as Course).language} · ${(item as Course).title}`
+                  : (item as Recipe).name}
+              </strong>
+              <small>
+                {mode === "course"
+                  ? `Semaine ${(item as Course).week_number ?? "—"} · Cours ${(item as Course).course_number}`
+                  : `${(item as Recipe).meal_type} · ${(item as Recipe).prep_minutes ?? "—"} min`}
+              </small>
+            </div>
+            <button
+              className="inline-action"
+              type="button"
+              onClick={() =>
+                mode === "course"
+                  ? editCourse(item as Course)
+                  : editRecipe(item as Recipe)
+              }
+            >
+              <PencilLine size={14} /> Modifier
+            </button>
+            <button
+              className="inline-action danger"
+              type="button"
+              onClick={() => void remove(mode, item.id)}
+            >
+              <Trash2 size={14} /> Supprimer
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

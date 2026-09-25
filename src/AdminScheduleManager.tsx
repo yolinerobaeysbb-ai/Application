@@ -1,31 +1,425 @@
-import { useEffect, useState } from 'react'
-import { PencilLine, Trash2 } from 'lucide-react'
-import { supabase } from './lib/supabase'
-import { trashDelete } from './lib/trash'
+import { useEffect, useState } from "react";
+import { PencilLine, Trash2 } from "lucide-react";
+import { supabase } from "./lib/supabase";
+import { trashDelete } from "./lib/trash";
+import MathField from './MathField';
+import "./math.css";
 
-type Category = 'language' | 'sport' | 'food' | 'fixed'
-type Recurrence = 'once' | 'daily' | 'weekly' | 'biweekly'
-type Item = { id: string; user_id: string | null; category: Category; language: string | null; title: string; description: string; duration_minutes: number | null; day_of_week: number; recurrence: Recurrence; start_time: string | null; end_time: string | null }
-type Profile = { id: string; email: string }
-type Form = { user_id: string; category: Category; language: string; title: string; description: string; duration: string; day: number; recurrence: Recurrence; start_time: string; end_time: string; warmup: string; main_workout: string; cooldown: string; equipment: string }
-const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
-const recurrenceLabels: Record<Recurrence, string> = { once: 'Une seule fois', daily: 'Tous les jours', weekly: 'Chaque semaine', biweekly: 'Une semaine sur deux' }
-const emptyForm: Form = { user_id: '', category: 'sport', language: 'Allemand', title: '', description: '', duration: '', day: 1, recurrence: 'weekly', start_time: '', end_time: '', warmup: '', main_workout: '', cooldown: '', equipment: '' }
+type Category = "language" | "sport" | "food" | "fixed";
+type Recurrence = "once" | "daily" | "weekly" | "biweekly";
+type Item = {
+  id: string;
+  user_id: string | null;
+  category: Category;
+  language: string | null;
+  title: string;
+  description: string;
+  duration_minutes: number | null;
+  day_of_week: number;
+  recurrence: Recurrence;
+  start_time: string | null;
+  end_time: string | null;
+};
+type Profile = { id: string; email: string };
+type Form = {
+  user_id: string;
+  category: Category;
+  language: string;
+  title: string;
+  description: string;
+  duration: string;
+  day: number;
+  recurrence: Recurrence;
+  start_time: string;
+  end_time: string;
+  warmup: string;
+  main_workout: string;
+  cooldown: string;
+  equipment: string;
+};
+const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+const recurrenceLabels: Record<Recurrence, string> = { once: "Une seule fois", daily: "Tous les jours", weekly: "Chaque semaine", biweekly: "Une semaine sur deux" };
+const emptyForm: Form = { user_id: "", category: "sport", language: "Allemand", title: "", description: "", duration: "", day: 1, recurrence: "weekly", start_time: "", end_time: "", warmup: "", main_workout: "", cooldown: "", equipment: "" };
 
-export default function AdminScheduleManager({ week, currentUserId, categoryFilter, addRequestId }: { week: number; currentUserId: string; categoryFilter?: Category; addRequestId?: number }) {
-  const [items, setItems] = useState<Item[]>([])
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [form, setForm] = useState<Form>(emptyForm)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [message, setMessage] = useState('')
-  async function load() { const { data } = await supabase.from('weekly_schedule_items').select('id, user_id, category, language, title, description, duration_minutes, day_of_week, recurrence, start_time, end_time').eq('week_number', week).order('day_of_week'); setItems((data ?? []) as Item[]) }
-  useEffect(() => { void load(); supabase.from('profiles').select('id, email').order('email').then(({ data }) => setProfiles((data ?? []) as Profile[])) }, [week])
-  function reset() { setEditingId(null); setForm({ ...emptyForm, user_id: currentUserId, category: categoryFilter ?? emptyForm.category }); setMessage('') }
-  useEffect(() => { if (addRequestId) { reset(); setOpen(true) } }, [addRequestId])
-  const visibleItems = categoryFilter ? items.filter((item) => item.category === categoryFilter) : []
-  async function edit(item: Item) { setEditingId(item.id); setOpen(true); const workout = item.category === 'sport' ? await supabase.from('workout_sessions').select('warmup, main_workout, cooldown, equipment').eq('schedule_item_id', item.id).maybeSingle() : { data: null }; setForm({ user_id: item.user_id ?? '', category: item.category, language: item.language ?? 'Allemand', title: item.title, description: item.description, duration: item.duration_minutes?.toString() ?? '', day: item.day_of_week, recurrence: item.recurrence, start_time: item.start_time ?? '', end_time: item.end_time ?? '', warmup: workout.data?.warmup ?? '', main_workout: workout.data?.main_workout ?? '', cooldown: workout.data?.cooldown ?? '', equipment: workout.data?.equipment ?? '' }); setMessage('') }
-  async function save(event: React.FormEvent) { event.preventDefault(); const payload = { user_id: form.user_id || null, category: form.category, language: form.category === 'language' ? form.language : null, week_number: week, day_of_week: Number(form.day), title: form.title.trim(), description: form.description.trim(), duration_minutes: form.duration ? Number(form.duration) : null, recurrence: form.recurrence, start_time: form.start_time || null, end_time: form.end_time || null }; const result = editingId ? await supabase.from('weekly_schedule_items').update(payload).eq('id', editingId) : await supabase.from('weekly_schedule_items').insert(payload).select('id').single(); if (result.error) { setMessage(result.error.message); return }; const itemId = editingId ?? (result.data as { id: string }).id; if (form.category === 'sport') { const workout = await supabase.from('workout_sessions').upsert({ schedule_item_id: itemId, program: form.title.trim(), session_name: form.title.trim(), warmup: form.warmup.trim(), main_workout: form.main_workout.trim(), cooldown: form.cooldown.trim(), equipment: form.equipment.trim() }, { onConflict: 'schedule_item_id' }); if (workout.error) { setMessage(workout.error.message); return } }; reset(); setOpen(false); await load() }
-  async function remove(id: string) { const item = items.find((entry) => entry.id === id); if (!item) return; const { error } = await trashDelete('weekly_schedule_items', item); if (error) setMessage(error); else await load() }
-  return <section className="library-admin schedule-admin"><div className="library-admin-heading"><div><p className="card-kicker">Administration · semaine {week}</p><h3>Gérer les activités</h3><p className="muted">Modifie les cours, programmes sportifs et repas de cette semaine.</p></div></div>{open && <form className="library-admin-form" onSubmit={(event) => void save(event)}><label>Appliquer à<select value={form.user_id} onChange={(event) => setForm((current) => ({ ...current, user_id: event.target.value }))}><option value={currentUserId}>Moi uniquement</option><option value="">Tous les utilisateurs</option>{profiles.filter((profile) => profile.id !== currentUserId).map((profile) => <option value={profile.id} key={profile.id}>{profile.email}</option>)}</select></label><div className="library-form-grid"><label>Catégorie<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as Category }))}><option value="language">Cours</option><option value="sport">Sport / entraînement</option><option value="food">Nourriture / repas</option><option value="fixed">Activité fixe</option></select></label><label>Jour<select value={form.day} onChange={(event) => setForm((current) => ({ ...current, day: Number(event.target.value) }))}>{days.map((day, index) => <option value={index + 1} key={day}>{day}</option>)}</select></label><label>Durée (min)<input type="number" min={1} value={form.duration} onChange={(event) => setForm((current) => ({ ...current, duration: event.target.value }))} /></label></div><div className="library-form-grid"><label>Récurrence<select value={form.recurrence} onChange={(event) => setForm((current) => ({ ...current, recurrence: event.target.value as Recurrence }))}>{(Object.keys(recurrenceLabels) as Recurrence[]).map((key) => <option value={key} key={key}>{recurrenceLabels[key]}</option>)}</select></label><label>Heure de début<input type="time" value={form.start_time} onChange={(event) => setForm((current) => ({ ...current, start_time: event.target.value }))} /></label><label>Heure de fin<input type="time" value={form.end_time} onChange={(event) => setForm((current) => ({ ...current, end_time: event.target.value }))} /></label></div>{form.category === 'language' && <label>Langue<input value={form.language} onChange={(event) => setForm((current) => ({ ...current, language: event.target.value }))} /></label>}<label>Titre<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} required /></label><label>Description<textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></label>{form.category === 'sport' && <><label>Échauffement<textarea rows={3} value={form.warmup} onChange={(event) => setForm((current) => ({ ...current, warmup: event.target.value }))} /></label><label>Bloc principal<textarea rows={4} value={form.main_workout} onChange={(event) => setForm((current) => ({ ...current, main_workout: event.target.value }))} /></label><label>Retour au calme<textarea rows={3} value={form.cooldown} onChange={(event) => setForm((current) => ({ ...current, cooldown: event.target.value }))} /></label><label>Matériel<input value={form.equipment} onChange={(event) => setForm((current) => ({ ...current, equipment: event.target.value }))} /></label></>}{message && <p className="form-error">{message}</p>}<div className="recap-actions"><button className="primary-button" type="submit">{editingId ? 'Mettre à jour' : 'Enregistrer'}</button><button className="secondary-button" type="button" onClick={() => { reset(); setOpen(false) }}>Annuler</button></div></form>}<div className="library-admin-list">{visibleItems.map((item) => <div className="library-admin-row" key={item.id}><div><strong>{item.title}</strong><small>{days[item.day_of_week - 1]} · {item.category === 'sport' ? 'Sport / entraînement' : item.category === 'food' ? 'Nourriture' : `Cours · ${item.language ?? ''}`} · {item.user_id ? profiles.find((profile) => profile.id === item.user_id)?.email ?? 'Utilisateur' : 'Tous les utilisateurs'}</small></div><button className="inline-action" type="button" onClick={() => void edit(item)}><PencilLine size={14} /> Modifier</button><button className="inline-action danger" type="button" onClick={() => void remove(item.id)}><Trash2 size={14} /> Supprimer</button></div>)}</div></section>
+export default function AdminScheduleManager({
+  week,
+  currentUserId,
+  categoryFilter,
+  addRequestId,
+}: {
+  week: number;
+  currentUserId: string;
+  categoryFilter?: Category;
+  addRequestId?: number;
+}) {
+  const [items, setItems] = useState<Item[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [form, setForm] = useState<Form>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  async function load() {
+    const { data } = await supabase
+      .from("weekly_schedule_items")
+      .select(
+        "id, user_id, category, language, title, description, duration_minutes, day_of_week, recurrence, start_time, end_time",
+      )
+      .eq("week_number", week)
+      .order("day_of_week");
+    setItems((data ?? []) as Item[]);
+  }
+  useEffect(() => {
+    void load();
+    supabase
+      .from("profiles")
+      .select("id, email")
+      .order("email")
+      .then(({ data }) => setProfiles((data ?? []) as Profile[]));
+  }, [week]);
+  function reset() {
+    setEditingId(null);
+    setForm({
+      ...emptyForm,
+      user_id: currentUserId,
+      category: categoryFilter ?? emptyForm.category,
+    });
+    setMessage("");
+  }
+  useEffect(() => {
+    if (addRequestId) {
+      reset();
+      setOpen(true);
+    }
+  }, [addRequestId]);
+  const visibleItems = categoryFilter
+    ? items.filter((item) => item.category === categoryFilter)
+    : [];
+  async function edit(item: Item) {
+    setEditingId(item.id);
+    setOpen(true);
+    const workout =
+      item.category === "sport"
+        ? await supabase
+            .from("workout_sessions")
+            .select("warmup, main_workout, cooldown, equipment")
+            .eq("schedule_item_id", item.id)
+            .maybeSingle()
+        : { data: null };
+    setForm({
+      user_id: item.user_id ?? "",
+      category: item.category,
+      language: item.language ?? "Allemand",
+      title: item.title,
+      description: item.description,
+      duration: item.duration_minutes?.toString() ?? "",
+      day: item.day_of_week,
+      recurrence: item.recurrence,
+      start_time: item.start_time ?? "",
+      end_time: item.end_time ?? "",
+      warmup: workout.data?.warmup ?? "",
+      main_workout: workout.data?.main_workout ?? "",
+      cooldown: workout.data?.cooldown ?? "",
+      equipment: workout.data?.equipment ?? "",
+    });
+    setMessage("");
+  }
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    const payload = {
+      user_id: form.user_id || null,
+      category: form.category,
+      language: form.category === "language" ? form.language : null,
+      week_number: week,
+      day_of_week: Number(form.day),
+      title: form.title.trim(),
+      description: form.description.trim(),
+      duration_minutes: form.duration ? Number(form.duration) : null,
+      recurrence: form.recurrence,
+      start_time: form.start_time || null,
+      end_time: form.end_time || null,
+    };
+    const result = editingId
+      ? await supabase
+          .from("weekly_schedule_items")
+          .update(payload)
+          .eq("id", editingId)
+      : await supabase
+          .from("weekly_schedule_items")
+          .insert(payload)
+          .select("id")
+          .single();
+    if (result.error) {
+      setMessage(result.error.message);
+      return;
+    }
+    const itemId = editingId ?? (result.data as { id: string }).id;
+    if (form.category === "sport") {
+      const workout = await supabase
+        .from("workout_sessions")
+        .upsert(
+          {
+            schedule_item_id: itemId,
+            program: form.title.trim(),
+            session_name: form.title.trim(),
+            warmup: form.warmup.trim(),
+            main_workout: form.main_workout.trim(),
+            cooldown: form.cooldown.trim(),
+            equipment: form.equipment.trim(),
+          },
+          { onConflict: "schedule_item_id" },
+        );
+      if (workout.error) {
+        setMessage(workout.error.message);
+        return;
+      }
+    }
+    reset();
+    setOpen(false);
+    await load();
+  }
+  async function remove(id: string) {
+    const item = items.find((entry) => entry.id === id);
+    if (!item) return;
+    const { error } = await trashDelete("weekly_schedule_items", item);
+    if (error) setMessage(error);
+    else await load();
+  }
+  return (
+    <section className="library-admin schedule-admin">
+      <div className="library-admin-heading">
+        <div>
+          <p className="card-kicker">Administration · semaine {week}</p>
+          <h3>Gérer les activités</h3>
+          <p className="muted">
+            Modifie les cours, programmes sportifs et repas de cette semaine.
+          </p>
+        </div>
+      </div>
+      {open && (
+        <form
+          className="library-admin-form"
+          onSubmit={(event) => void save(event)}
+        >
+          <label>
+            Appliquer à
+            <select
+              value={form.user_id}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  user_id: event.target.value,
+                }))
+              }
+            >
+              <option value={currentUserId}>Moi uniquement</option>
+              <option value="">Tous les utilisateurs</option>
+              {profiles
+                .filter((profile) => profile.id !== currentUserId)
+                .map((profile) => (
+                  <option value={profile.id} key={profile.id}>
+                    {profile.email}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <div className="library-form-grid">
+            <label>
+              Catégorie
+              <select
+                value={form.category}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    category: event.target.value as Category,
+                  }))
+                }
+              >
+                <option value="language">Cours</option>
+                <option value="sport">Sport / entraînement</option>
+                <option value="food">Nourriture / repas</option>
+                <option value="fixed">Activité fixe</option>
+              </select>
+            </label>
+            <label>
+              Jour
+              <select
+                value={form.day}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    day: Number(event.target.value),
+                  }))
+                }
+              >
+                {days.map((day, index) => (
+                  <option value={index + 1} key={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Durée (min)
+              <input
+                type="number"
+                min={1}
+                value={form.duration}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    duration: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </div>
+          <div className="library-form-grid">
+            <label>
+              Récurrence
+              <select
+                value={form.recurrence}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    recurrence: event.target.value as Recurrence,
+                  }))
+                }
+              >
+                {(Object.keys(recurrenceLabels) as Recurrence[]).map((key) => (
+                  <option value={key} key={key}>
+                    {recurrenceLabels[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Heure de début
+              <input
+                type="time"
+                value={form.start_time}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    start_time: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Heure de fin
+              <input
+                type="time"
+                value={form.end_time}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    end_time: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          </div>
+          {form.category === "language" && (
+            <label>
+              Langue
+              <input
+                value={form.language}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    language: event.target.value,
+                  }))
+                }
+              />
+            </label>
+          )}
+          <label>
+            Titre
+            <input
+              value={form.title}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              required
+            />
+          </label>
+          <MathField label="Description (LaTeX possible)" value={form.description} onChange={(value) => setForm((current) => ({ ...current, description: value }))} rows={4} />
+          {form.category === "sport" && (
+            <>
+              <MathField label="Échauffement (LaTeX possible)" value={form.warmup} onChange={(value) => setForm((current) => ({ ...current, warmup: value }))} rows={3} />
+              <MathField label="Bloc principal (LaTeX possible)" value={form.main_workout} onChange={(value) => setForm((current) => ({ ...current, main_workout: value }))} rows={4} />
+              <MathField label="Retour au calme (LaTeX possible)" value={form.cooldown} onChange={(value) => setForm((current) => ({ ...current, cooldown: value }))} rows={3} />
+              <label>
+                Matériel
+                <input
+                  value={form.equipment}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      equipment: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </>
+          )}
+          {message && <p className="form-error">{message}</p>}
+          <div className="recap-actions">
+            <button className="primary-button" type="submit">
+              {editingId ? "Mettre à jour" : "Enregistrer"}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                reset();
+                setOpen(false);
+              }}
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
+      <div className="library-admin-list">
+        {visibleItems.map((item) => (
+          <div className="library-admin-row" key={item.id}>
+            <div>
+              <strong>{item.title}</strong>
+              <small>
+                {days[item.day_of_week - 1]} ·{" "}
+                {item.category === "sport"
+                  ? "Sport / entraînement"
+                  : item.category === "food"
+                    ? "Nourriture"
+                    : `Cours · ${item.language ?? ""}`}{" "}
+                ·{" "}
+                {item.user_id
+                  ? (profiles.find((profile) => profile.id === item.user_id)
+                      ?.email ?? "Utilisateur")
+                  : "Tous les utilisateurs"}
+              </small>
+            </div>
+            <button
+              className="inline-action"
+              type="button"
+              onClick={() => void edit(item)}
+            >
+              <PencilLine size={14} /> Modifier
+            </button>
+            <button
+              className="inline-action danger"
+              type="button"
+              onClick={() => void remove(item.id)}
+            >
+              <Trash2 size={14} /> Supprimer
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
