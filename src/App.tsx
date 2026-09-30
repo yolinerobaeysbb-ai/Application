@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Activity, BookOpen, CalendarRange, Dumbbell, FileText, FolderOpen, Languages, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, Trash2, UserRound, Utensils, X } from 'lucide-react'
+import { Activity, BookOpen, CalendarRange, FolderOpen, Languages, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, UserRound, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
+import { programWeekForDate } from './lib/schedule'
 import PlanningV2 from './Planning'
 import SuggestionsV2 from './Suggestions'
 import NotificationBell from './NotificationBell'
@@ -13,20 +14,19 @@ import GlobalCalendar from './GlobalCalendar'
 import './App.css'
 
 const ADMIN_EMAIL = 'yoline.robaeysbb@gmail.com'
-const languages = ['Allemand', 'Coréen', 'Espagnol', 'Italien', 'Japonais', 'Néerlandais', 'Thaïlandais']
-type Tab = 'planning' | 'calendar' | 'courses' | 'recap' | 'resources' | 'progress' | 'suggestions' | 'settings' | 'admin'
-type ContentCategory = 'language' | 'sport' | 'food'
-type ContentItem = { id: string; category: ContentCategory; language: string | null; week: number; title: string; description: string; body: string; file_url: string | null; duration_minutes: number | null }
-type Suggestion = { id: string; category: string; message: string; status: 'pending' | 'treated' | 'deleted'; created_at: string; profiles?: { email: string }[] | null }
-type DocumentItem = { id: string; title: string; category: ContentCategory; language: string | null; file_path: string; file_name: string; mime_type: string; file_size: number | null }
-const bundledDocuments: DocumentItem[] = [
-  ...languages.map((language) => ({ id: `bundled-${language}`, title: `Cours de ${language}`, category: 'language' as ContentCategory, language, file_path: `/documents/${language === 'Néerlandais' ? 'Neerlandais' : language}.pdf`, file_name: `${language}.pdf`, mime_type: 'application/pdf', file_size: null })),
-  { id: 'bundled-food', title: 'Planning repas et recettes', category: 'food', language: null, file_path: '/documents/planning_repas%20(1).pdf', file_name: 'planning_repas (1).pdf', mime_type: 'application/pdf', file_size: null },
-  ...[['Mobilité 1', 'Phoenix - Mulsculation - Mobilité 1.xlsx'], ['Adaptation I', 'Phoenix - Musculation - Adapatation I.xlsx'], ['Adaptation II', 'Phoenix - Musculation - Adaptation II.xlsx'], ['Force', 'Phoenix - Musculation - Force.xlsx'], ['Hypertrophie', 'Phoenix - Musculation - Hypertrophie.xlsx'], ['Maintien I', 'Phoenix - Musculation - Maintien I.xlsx'], ['Maintien II', 'Phoenix - Musculation - Maintien II.xlsx'], ['Maintien III', 'Phoenix - Musculation - Maintien III.xlsx'], ['Maintien IV', 'Phoenix - Musculation - Maintien IV.xlsx'], ['Puissance', 'Phoenix - Musculation - Puissance.xlsx']].map(([program, fileName]) => ({ id: `bundled-${program}`, title: `Musculation · ${program}`, category: 'sport' as ContentCategory, language: null, file_path: `/documents/${encodeURIComponent(fileName)}`, file_name: `${program}.xlsx`, mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', file_size: null })),
-]
-
-type LoginProps = { email: string; password: string; setEmail: (value: string) => void; setPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReset: () => void; error: string; loading: boolean; uiText?: UiText }
+const tabs = ['planning', 'calendar', 'courses', 'recap', 'resources', 'progress', 'suggestions', 'settings', 'admin'] as const
+type Tab = (typeof tabs)[number]
 type UiText = Record<string, string>
+type LoginProps = { email: string; password: string; setEmail: (value: string) => void; setPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReset: () => void; error: string; loading: boolean; uiText?: UiText }
+
+function tabFromPath(pathname: string): Tab {
+  const segment = pathname.replace(/^\//, '').split('/')[0]
+  return tabs.includes(segment as Tab) ? (segment as Tab) : 'planning'
+}
+
+function pathForTab(tab: Tab) {
+  return tab === 'planning' ? '/' : `/${tab}`
+}
 
 function App() {
   const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']>(null)
@@ -34,13 +34,16 @@ function App() {
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<Tab>('planning')
+  const [tab, setTab] = useState<Tab>(() => (typeof window === 'undefined' ? 'planning' : tabFromPath(window.location.pathname)))
   const [week, setWeek] = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => typeof window !== 'undefined' && localStorage.getItem('keltia-theme') === 'dark')
   const [selectedActivity, setSelectedActivity] = useState<Parameters<typeof CourseHub>[0]['activity']>(null)
   const [uiText, setUiText] = useState<UiText>({})
   const [authReady, setAuthReady] = useState(false)
+  const [recoveryMode, setRecoveryMode] = useState(false)
+  const [displayName, setDisplayName] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     if (!isSupabaseConfigured) return
@@ -56,15 +59,37 @@ function App() {
       setAuthReady(true)
     }
     void initialize()
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
-    return () => listener.subscription.unsubscribe()
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      setSession(nextSession)
+      if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true)
+    })
+    const onPop = () => setTab(tabFromPath(window.location.pathname))
+    window.addEventListener('popstate', onPop)
+    return () => {
+      listener.subscription.unsubscribe()
+      window.removeEventListener('popstate', onPop)
+    }
   }, [])
 
   useEffect(() => { if (isSupabaseConfigured) supabase.from('app_settings').select('setting_key, setting_value').then(({ data }) => setUiText(Object.fromEntries((data ?? []).map((item) => [item.setting_key, item.setting_value])))) }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
+    localStorage.setItem('keltia-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
+
+  useEffect(() => {
+    if (!session) return
+    void (async () => {
+      const { data } = await supabase.from('profiles').select('display_name, role, theme, calendar_start_date').eq('id', session.user.id).maybeSingle()
+      setDisplayName(data?.display_name ?? '')
+      setIsAdmin(data?.role === 'admin' || session.user.email?.toLowerCase() === ADMIN_EMAIL)
+      if (data?.theme === 'dark' || data?.theme === 'light') setDarkMode(data.theme === 'dark')
+      const settings = await supabase.from('app_settings').select('setting_value').eq('setting_key', 'program_start_date').maybeSingle()
+      const start = data?.calendar_start_date ?? settings.data?.setting_value
+      if (start) setWeek(programWeekForDate(new Date(start)))
+    })()
+  }, [session])
 
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setAuthError('')
@@ -80,26 +105,53 @@ function App() {
     setAuthError(error ? 'Impossible d’envoyer le lien de réinitialisation.' : 'Un lien de réinitialisation a été envoyé si ce compte existe.')
   }
 
-  async function handleLogout() { await supabase.auth.signOut(); setSession(null) }
+  async function handleLogout() { await supabase.auth.signOut(); setSession(null); setRecoveryMode(false) }
+  async function persistTheme(value: boolean) {
+    setDarkMode(value)
+    if (session) await supabase.from('profiles').update({ theme: value ? 'dark' : 'light' }).eq('id', session.user.id)
+  }
+
   if (!isSupabaseConfigured) return <SetupNotice />
   if (!authReady) return <p className="loading-state">Chargement de la session...</p>
+  if (recoveryMode && session) return <RecoveryPage onDone={() => setRecoveryMode(false)} />
   if (!session) return <LoginPageWithText email={email} password={password} setEmail={setEmail} setPassword={setPassword} onSubmit={handleLogin} onReset={() => void handleReset()} error={authError} loading={loading} uiText={uiText} />
-  const isAdmin = session.user.email?.toLowerCase() === ADMIN_EMAIL
 
-  const navigate = (nextTab: Tab) => { setTab(nextTab); if (nextTab === 'courses') setSelectedActivity(null); setSidebarOpen(false); window.scrollTo({ top: 0, behavior: 'auto' }) }
-  const openActivity = (activity: NonNullable<Parameters<typeof CourseHub>[0]['activity']>) => { setSelectedActivity(activity); setTab('courses'); setSidebarOpen(false) }
+  const navigate = (nextTab: Tab) => {
+    setTab(nextTab)
+    if (nextTab === 'courses') setSelectedActivity(null)
+    setSidebarOpen(false)
+    window.history.pushState({}, '', `${pathForTab(nextTab)}${window.location.search}`)
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }
+  const openActivity = (activity: NonNullable<Parameters<typeof CourseHub>[0]['activity']>) => {
+    setSelectedActivity(activity)
+    setTab('courses')
+    setSidebarOpen(false)
+    window.history.pushState({}, '', `/courses${window.location.search}`)
+  }
+  const greeting = displayName || session.user.email?.split('@')[0] || ''
   return <div className={`keltia-app polar-theme ${darkMode ? 'theme-dark' : ''}`}>
-    <Sidebar activeTab={tab} isAdmin={isAdmin} email={session.user.email ?? ''} open={sidebarOpen} onNavigate={navigate} onClose={() => setSidebarOpen(false)} />
+    <Sidebar activeTab={tab} isAdmin={isAdmin} email={session.user.email ?? ''} displayName={displayName} open={sidebarOpen} onNavigate={navigate} onClose={() => setSidebarOpen(false)} />
     {sidebarOpen && <button className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" />}
     <div className="app-main"><header className="app-header"><button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu size={21} /></button><div><p className="header-kicker">Espace membre</p><strong>Keltia</strong></div><div className="header-actions">{isAdmin && <NotificationBell />}<button className="avatar-button" onClick={() => navigate('settings')} aria-label="Ouvrir les paramètres"><UserRound size={18} /></button></div></header>
-      <main className="page-content"><section className="welcome-row"><div><p className="eyebrow">Bonjour{session.user.email ? `, ${session.user.email.split('@')[0]}` : ''}</p><h1>{uiText.welcome_title || 'Votre espace pour progresser.'}</h1><p className="muted">{uiText.welcome_text || 'Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.'}</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>
-        {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={false} userId={session.user.id} onOpenActivity={openActivity} />}{tab === 'calendar' && <GlobalCalendar userId={session.user.id} />}{tab === 'courses' && <CourseHub activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} />}{tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}{tab === 'resources' && <Supports />}{tab === 'progress' && <ProgressDashboard userId={session.user.id} />}{tab === 'suggestions' && <SuggestionsV2 isAdmin={false} userId={session.user.id} />}{tab === 'settings' && <SettingsPanel userId={session.user.id} email={session.user.email ?? ''} isAdmin={isAdmin} darkMode={darkMode} onDarkModeChange={setDarkMode} onLogout={() => void handleLogout()} />}{tab === 'admin' && isAdmin && <AdminDashboard week={week} setWeek={setWeek} currentUserId={session.user.id} onSaved={setUiText} />}{isAdmin && tab !== 'settings' && tab !== 'admin' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
+      <main className="page-content">
+        {tab === 'planning' && <section className="welcome-row"><div><p className="eyebrow">Bonjour{greeting ? `, ${greeting}` : ''}</p><h1>{uiText.welcome_title || 'Votre espace pour progresser.'}</h1><p className="muted">{uiText.welcome_text || 'Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.'}</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>}
+        {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={false} userId={session.user.id} onOpenActivity={openActivity} />}
+        {tab === 'calendar' && <GlobalCalendar userId={session.user.id} />}
+        {tab === 'courses' && <CourseHub userId={session.user.id} activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} />}
+        {tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}
+        {tab === 'resources' && <Supports />}
+        {tab === 'progress' && <ProgressDashboard userId={session.user.id} />}
+        {tab === 'suggestions' && <SuggestionsV2 isAdmin={false} userId={session.user.id} />}
+        {tab === 'settings' && <SettingsPanel userId={session.user.id} email={session.user.email ?? ''} isAdmin={isAdmin} displayName={displayName} onDisplayNameChange={setDisplayName} darkMode={darkMode} onDarkModeChange={(value) => void persistTheme(value)} onLogout={() => void handleLogout()} />}
+        {tab === 'admin' && isAdmin && <AdminDashboard week={week} setWeek={setWeek} currentUserId={session.user.id} onSaved={setUiText} />}
+        {isAdmin && tab !== 'settings' && tab !== 'admin' && <div className="admin-badge"><ShieldCheck size={16} /> Mode administrateur actif</div>}
       </main><footer>KELTIA <span>·</span> espace privé membre</footer></div>
   </div>
 }
 
 function KeltiaMark({ large = false }: { large?: boolean }) { return <div className={`keltia-mark ${large ? 'large' : ''}`}><img src="/keltia-logo.png" alt="Logo Keltia" /><div><strong>Keltia</strong><small>espace membre</small></div></div> }
-function Sidebar({ activeTab, isAdmin, email, open, onNavigate, onClose }: { activeTab: Tab; isAdmin: boolean; email: string; open: boolean; onNavigate: (tab: Tab) => void; onClose: () => void }) {
+function Sidebar({ activeTab, isAdmin, email, displayName, open, onNavigate, onClose }: { activeTab: Tab; isAdmin: boolean; email: string; displayName: string; open: boolean; onNavigate: (tab: Tab) => void; onClose: () => void }) {
   const items: { tab: Tab; label: string; caption: string; icon: React.ReactNode }[] = [
     { tab: 'planning', label: 'Tableau de bord', caption: 'Plannings', icon: <LayoutDashboard size={18} /> },
     { tab: 'calendar', label: 'Planning global', caption: 'Calendrier combiné', icon: <CalendarRange size={18} /> },
@@ -110,18 +162,20 @@ function Sidebar({ activeTab, isAdmin, email, open, onNavigate, onClose }: { act
     { tab: 'suggestions', label: 'Idées', caption: 'Faire évoluer Keltia', icon: <MessageSquarePlus size={18} /> },
     ...(isAdmin ? [{ tab: 'admin' as const, label: 'Administration', caption: 'Gestion et simulation', icon: <ShieldCheck size={18} /> }] : []),
   ]
-  return <aside className={`sidebar ${open ? 'is-open' : ''}`}><div className="sidebar-top"><KeltiaMark /><button className="sidebar-close" onClick={onClose} aria-label="Fermer le menu"><X size={19} /></button></div><div className="sidebar-label">Navigation</div><nav className="sidebar-nav" aria-label="Navigation principale">{items.map((item, index) => <button className={`sidebar-link ${activeTab === item.tab ? 'active' : ''}`} key={`${item.label}-${index}`} onClick={() => onNavigate(item.tab)}>{item.icon}<span><strong>{item.label}</strong><small>{item.caption}</small></span></button>)}</nav><div className="sidebar-bottom"><button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => onNavigate('settings')}><Settings size={18} /><span><strong>Paramètres</strong><small>Compte et préférences</small></span></button><div className="sidebar-user"><span className="user-avatar">{email.slice(0, 1).toUpperCase() || 'K'}</span><span><strong>{email.split('@')[0] || 'Membre'}</strong><small>{isAdmin ? 'Administrateur' : 'Membre'}</small></span></div></div></aside>
+  const label = displayName || email.split('@')[0] || 'Membre'
+  return <aside className={`sidebar ${open ? 'is-open' : ''}`}><div className="sidebar-top"><KeltiaMark /><button className="sidebar-close" onClick={onClose} aria-label="Fermer le menu"><X size={19} /></button></div><div className="sidebar-label">Navigation</div><nav className="sidebar-nav" aria-label="Navigation principale">{items.map((item, index) => <button className={`sidebar-link ${activeTab === item.tab ? 'active' : ''}`} key={`${item.label}-${index}`} onClick={() => onNavigate(item.tab)}>{item.icon}<span><strong>{item.label}</strong><small>{item.caption}</small></span></button>)}</nav><div className="sidebar-bottom"><button className={`sidebar-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => onNavigate('settings')}><Settings size={18} /><span><strong>Paramètres</strong><small>Compte et préférences</small></span></button><div className="sidebar-user"><span className="user-avatar">{label.slice(0, 1).toUpperCase() || 'K'}</span><span><strong>{label}</strong><small>{isAdmin ? 'Administrateur' : 'Membre'}</small></span></div></div></aside>
 }
-function SettingsPanel({ userId, email, isAdmin, darkMode, onDarkModeChange, onLogout }: { userId: string; email: string; isAdmin: boolean; darkMode: boolean; onDarkModeChange: (value: boolean) => void; onLogout: () => void }) {
-  const [displayName, setDisplayName] = useState('')
+function SettingsPanel({ userId, email, isAdmin, displayName, onDisplayNameChange, darkMode, onDarkModeChange, onLogout }: { userId: string; email: string; isAdmin: boolean; displayName: string; onDisplayNameChange: (value: string) => void; darkMode: boolean; onDarkModeChange: (value: boolean) => void; onLogout: () => void }) {
+  const [nameDraft, setNameDraft] = useState(displayName)
   const [newPassword, setNewPassword] = useState('')
   const [profileMessage, setProfileMessage] = useState('')
   const [passwordMessage, setPasswordMessage] = useState('')
   const [saving, setSaving] = useState(false)
-  useEffect(() => { supabase.from('profiles').select('display_name').eq('id', userId).maybeSingle().then(({ data }) => setDisplayName(data?.display_name ?? '')) }, [userId])
+  useEffect(() => { setNameDraft(displayName) }, [displayName])
   async function saveDisplayName(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setProfileMessage('')
-    const { error } = await supabase.from('profiles').update({ display_name: displayName.trim() || null }).eq('id', userId)
+    const { error } = await supabase.from('profiles').update({ display_name: nameDraft.trim() || null }).eq('id', userId)
+    if (!error) onDisplayNameChange(nameDraft.trim())
     setProfileMessage(error ? 'Impossible d’enregistrer le nom d’utilisateur.' : 'Nom d’utilisateur enregistré.')
     setSaving(false)
   }
@@ -132,32 +186,24 @@ function SettingsPanel({ userId, email, isAdmin, darkMode, onDarkModeChange, onL
     setPasswordMessage(error ? 'Impossible de modifier le mot de passe.' : 'Mot de passe modifié.')
     if (!error) setNewPassword('')
   }
-  return <section className="settings-page"><div className="section-intro"><p className="eyebrow">Votre compte</p><h2>Paramètres</h2><p className="muted">Gérez votre profil et les préférences de votre espace Keltia.</p></div><div className="settings-grid"><article className="settings-card profile-card"><div className="profile-avatar">{(displayName || email).slice(0, 1).toUpperCase() || 'K'}</div><div><p className="card-kicker">Profil</p><h3>{displayName || email.split('@')[0] || 'Membre Keltia'}</h3><p className="muted">{email}</p><span className="role-pill">{isAdmin ? 'Administrateur' : 'Membre'}</span></div></article><article className="settings-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}><form onSubmit={(event) => void saveDisplayName(event)} style={{ display: 'grid', gap: 10 }}><label>Nom d’utilisateur<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Votre nom affiché" maxLength={60} /></label><button className="primary-button" type="submit" disabled={saving}>Enregistrer le nom</button>{profileMessage && <p className="form-feedback">{profileMessage}</p>}</form></article><article className="settings-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}><form onSubmit={(event) => void changePassword(event)} style={{ display: 'grid', gap: 10 }}><label>Nouveau mot de passe<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Au moins 6 caractères" autoComplete="new-password" /></label><button className="primary-button" type="submit">Modifier le mot de passe</button>{passwordMessage && <p className="form-feedback">{passwordMessage}</p>}</form></article><article className="settings-card"><div className="setting-row"><span className="setting-icon"><Moon size={18} /></span><span><strong>Apparence sombre</strong><small>Adapter l’affichage à votre environnement</small></span><button className={`toggle ${darkMode ? 'on' : ''}`} onClick={() => onDarkModeChange(!darkMode)} aria-label="Activer ou désactiver le mode sombre" aria-pressed={darkMode}><span /></button></div><div className="setting-row"><span className="setting-icon"><Sun size={18} /></span><span><strong>Thème actuel</strong><small>{darkMode ? 'Sombre' : 'Clair'}</small></span></div></article><article className="settings-card danger-card"><div><p className="card-kicker">Session</p><h3>Quitter Keltia</h3><p className="muted">Vous pourrez vous reconnecter à tout moment avec votre adresse email.</p></div><button className="logout-button" onClick={onLogout}><LogOut size={16} /> Se déconnecter</button></article></div></section>
+  return <section className="settings-page"><div className="section-intro"><p className="eyebrow">Votre compte</p><h2>Paramètres</h2><p className="muted">Gérez votre profil et les préférences de votre espace Keltia.</p></div><div className="settings-grid"><article className="settings-card profile-card"><div className="profile-avatar">{(displayName || email).slice(0, 1).toUpperCase() || 'K'}</div><div><p className="card-kicker">Profil</p><h3>{displayName || email.split('@')[0] || 'Membre Keltia'}</h3><p className="muted">{email}</p><span className="role-pill">{isAdmin ? 'Administrateur' : 'Membre'}</span></div></article><article className="settings-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}><form onSubmit={(event) => void saveDisplayName(event)} style={{ display: 'grid', gap: 10 }}><label>Nom d’utilisateur<input value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} placeholder="Votre nom affiché" maxLength={60} /></label><button className="primary-button" type="submit" disabled={saving}>Enregistrer le nom</button>{profileMessage && <p className="form-feedback">{profileMessage}</p>}</form></article><article className="settings-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}><form onSubmit={(event) => void changePassword(event)} style={{ display: 'grid', gap: 10 }}><label>Nouveau mot de passe<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Au moins 6 caractères" autoComplete="new-password" /></label><button className="primary-button" type="submit">Modifier le mot de passe</button>{passwordMessage && <p className="form-feedback">{passwordMessage}</p>}</form></article><article className="settings-card"><div className="setting-row"><span className="setting-icon"><Moon size={18} /></span><span><strong>Apparence sombre</strong><small>Adapter l’affichage à votre environnement</small></span><button className={`toggle ${darkMode ? 'on' : ''}`} onClick={() => onDarkModeChange(!darkMode)} aria-label="Activer ou désactiver le mode sombre" aria-pressed={darkMode}><span /></button></div><div className="setting-row"><span className="setting-icon"><Sun size={18} /></span><span><strong>Thème actuel</strong><small>{darkMode ? 'Sombre' : 'Clair'}</small></span></div></article><article className="settings-card danger-card"><div><p className="card-kicker">Session</p><h3>Quitter Keltia</h3><p className="muted">Vous pourrez vous reconnecter à tout moment avec votre adresse email.</p></div><button className="logout-button" onClick={onLogout}><LogOut size={16} /> Se déconnecter</button></article></div></section>
+}
+function RecoveryPage({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    if (password.length < 6) { setMessage('Le mot de passe doit contenir au moins 6 caractères.'); return }
+    setSaving(true)
+    const { error } = await supabase.auth.updateUser({ password })
+    setSaving(false)
+    if (error) { setMessage('Impossible d’enregistrer le nouveau mot de passe.'); return }
+    onDone()
+  }
+  return <div className="login-page polar-login"><div className="login-art"><KeltiaMark large /><p className="eyebrow">SÉCURITÉ</p><h1>Choisissez un nouveau mot de passe.</h1><p>Après validation, vous retrouverez votre espace membre.</p></div><form className="login-card" onSubmit={(event) => void submit(event)}><KeltiaMark large /><h2>Réinitialisation</h2><p className="muted">Saisissez un mot de passe d’au moins 6 caractères.</p><label>Nouveau mot de passe<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="new-password" /></label>{message && <p className="form-error">{message}</p>}<button className="primary-button" disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button></form></div>
 }
 function LoginPageWithText({ uiText, ...props }: LoginProps & { uiText: UiText }) { return <div className="login-page polar-login"><div className="login-art"><KeltiaMark large /><p className="eyebrow">VOTRE ESPACE PERSONNEL</p><h1>{uiText.login_hero_title || 'Un rythme qui vous ressemble.'}</h1><p>{uiText.login_hero_text || 'Langues, mouvement et nutrition réunis dans un espace simple, calme et privé.'}</p></div><form className="login-card" onSubmit={props.onSubmit}><KeltiaMark large /><h2>{uiText.login_title || 'Bienvenue.'}</h2><p className="muted">{uiText.login_text || 'Connectez-vous pour retrouver votre parcours.'}</p><label>Email<input type="email" value={props.email} onChange={(event) => props.setEmail(event.target.value)} required autoComplete="email" /></label><label>Mot de passe<input type="password" value={props.password} onChange={(event) => props.setPassword(event.target.value)} required autoComplete="current-password" /></label>{props.error && <p className="form-error">{props.error}</p>}<button className="primary-button" disabled={props.loading}>{props.loading ? 'Connexion...' : uiText.login_button || 'Ouvrir mon espace'}</button><button className="reset-button" type="button" onClick={props.onReset}>Mot de passe oublié ?</button></form></div> }
-function LoginPage({ email, password, setEmail, setPassword, onSubmit, onReset, error, loading }: LoginProps) { return <LoginPageWithText uiText={{}} email={email} password={password} setEmail={setEmail} setPassword={setPassword} onSubmit={onSubmit} onReset={onReset} error={error} loading={loading} /> }
 function SetupNotice() { return <div className="setup-page"><div className="setup-card"><KeltiaMark large /><h1>La base de données attend ses clés.</h1><p className="muted">Créez un fichier <code>.env.local</code> à la racine avec <code>VITE_SUPABASE_URL</code> et <code>VITE_SUPABASE_ANON_KEY</code>, puis relancez le serveur.</p><div className="code-block">VITE_SUPABASE_URL=https://...supabase.co<br />VITE_SUPABASE_ANON_KEY=...</div></div></div> }
-function Planning({ week, isAdmin }: { week: number; isAdmin: boolean }) {
-  const [items, setItems] = useState<ContentItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ category: 'language' as ContentCategory, language: languages[0], title: '', description: '', week: String(week), duration: '' })
-  async function loadItems() { setLoading(true); const { data } = await supabase.from('content_items').select('*').eq('week', week).order('category').order('title'); setItems((data ?? []) as ContentItem[]); setLoading(false) }
-  useEffect(() => { void loadItems() }, [week])
-  async function addContent(event: React.FormEvent) { event.preventDefault(); const { error } = await supabase.from('content_items').insert({ category: form.category, language: form.category === 'language' ? form.language : null, week: Number(form.week), title: form.title, description: form.description, duration_minutes: form.duration ? Number(form.duration) : null }); if (!error) { setForm({ ...form, title: '', description: '', duration: '' }); void loadItems() } }
-  async function removeContent(id: string) { await supabase.from('content_items').delete().eq('id', id); setItems(items.filter((item) => item.id !== id)) }
-  const grouped = { language: items.filter((item) => item.category === 'language'), sport: items.filter((item) => item.category === 'sport'), food: items.filter((item) => item.category === 'food') }
-  return <section className="content-grid"><div className="section-intro"><p className="eyebrow">Semaine {week.toString().padStart(2, '0')}</p><h2>Le plan du jour, sans bruit.</h2><p className="muted">Les contenus de cette semaine sont chargés depuis Supabase.</p></div><div className="feature-grid"><ContentCard icon={<BookOpen />} className="language-card" label="Langues" items={grouped.language} isAdmin={isAdmin} onDelete={removeContent} /><ContentCard icon={<Dumbbell />} className="sport-card" label="Sport / muscu" items={grouped.sport} isAdmin={isAdmin} onDelete={removeContent} /><ContentCard icon={<Utensils />} className="food-card" label="Nourriture" items={grouped.food} isAdmin={isAdmin} onDelete={removeContent} /></div>{loading && <p className="muted">Chargement des contenus...</p>}{isAdmin && <form className="admin-editor" onSubmit={addContent}><p className="card-kicker">Administration · nouveau contenu</p><div className="editor-fields"><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as ContentCategory })}><option value="language">Langue</option><option value="sport">Sport</option><option value="food">Nourriture</option></select>{form.category === 'language' && <select value={form.language} onChange={(event) => setForm({ ...form, language: event.target.value })}>{languages.map((language) => <option key={language}>{language}</option>)}</select>}<input type="number" min="1" max="16" value={form.week} onChange={(event) => setForm({ ...form, week: event.target.value })} placeholder="Semaine" required /><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Titre" required /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Résumé" /><input type="number" min="1" value={form.duration} onChange={(event) => setForm({ ...form, duration: event.target.value })} placeholder="Durée (min)" /></div><button className="primary-button">Ajouter le contenu</button></form>}<div className="pronunciation"><div><p className="card-kicker">Prononciation</p><h3>Une phrase à faire sonner juste.</h3><p>Le module audio et microphone sera disponible avec le contenu de la semaine.</p></div><button className="outline-button">Ouvrir l'exercice</button></div></section>
-}
-function ContentCard({ icon, className, label, items, isAdmin, onDelete }: { icon: React.ReactNode; className: string; label: string; items: ContentItem[]; isAdmin: boolean; onDelete: (id: string) => void }) { return <article className={`feature-card ${className}`}><div className="card-icon">{icon}</div><div><p className="card-kicker">{label}</p>{items.length ? items.map((item) => <div className="content-entry" key={item.id}><h3>{item.title}</h3><p>{item.description || 'Contenu à découvrir.'}{item.duration_minutes ? ` · ${item.duration_minutes} min` : ''}</p>{isAdmin && <button className="delete-button" onClick={() => onDelete(item.id)} aria-label={`Supprimer ${item.title}`}><Trash2 size={14} /></button>}</div>) : <p>Aucun contenu pour cette semaine.</p>}</div></article> }
-function Resources() { const [documents, setDocuments] = useState<DocumentItem[]>(bundledDocuments); const [uploading, setUploading] = useState(false); const [message, setMessage] = useState(''); const isAdmin = useSessionIsAdmin(); async function loadDocuments() { const { data } = await supabase.from('documents').select('*').order('category').order('title'); setDocuments([...bundledDocuments, ...((data ?? []) as DocumentItem[])]) } useEffect(() => { void loadDocuments() }, []); async function uploadDocuments(event: React.ChangeEvent<HTMLInputElement>) { const files = Array.from(event.target.files ?? []); if (!files.length) return; setUploading(true); setMessage(''); for (const file of files) { const category = file.name.toLowerCase().includes('repas') ? 'food' : file.name.toLowerCase().includes('musculation') || file.name.toLowerCase().includes('mulsculation') ? 'sport' : 'language'; const language = category === 'language' ? languages.find((item) => file.name.toLowerCase().includes(item.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))) ?? null : null; const path = `${category}/${crypto.randomUUID()}-${file.name}`; const storage = await supabase.storage.from('phoenix-documents').upload(path, file, { upsert: false }); if (storage.error) { setMessage(`Erreur pour ${file.name}.`); continue } const { error } = await supabase.from('documents').insert({ title: file.name.replace(/\.[^.]+$/, ''), category, language, file_path: path, file_name: file.name, mime_type: file.type || 'application/octet-stream', file_size: file.size }); if (error) { await supabase.storage.from('phoenix-documents').remove([path]); setMessage(`Erreur d’enregistrement pour ${file.name}.`) } } await loadDocuments(); setUploading(false); event.target.value = '' }; async function openDocument(document: DocumentItem) { if (document.file_path.startsWith('/documents/')) { window.open(document.file_path, '_blank', 'noopener,noreferrer'); return } const { data, error } = await supabase.storage.from('phoenix-documents').createSignedUrl(document.file_path, 300); if (!error && data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer') } async function removeDocument(document: DocumentItem) { if (document.file_path.startsWith('/documents/')) return; await supabase.storage.from('phoenix-documents').remove([document.file_path]); await supabase.from('documents').delete().eq('id', document.id); setDocuments(documents.filter((item) => item.id !== document.id)) } return <section className="content-grid"><div className="section-intro"><p className="eyebrow">Ressources partagées</p><h2>Les supports du parcours, au même endroit.</h2><p className="muted">Tous les membres connectés peuvent consulter les PDF et programmes disponibles.</p></div><div className="document-list">{documents.length ? documents.map((document) => <div className="document-row" key={document.id}><FileText size={20} /><div><strong>{document.title}</strong><span>{document.category === 'language' ? document.language : document.category === 'sport' ? 'Sport / musculation' : 'Nutrition'} · {document.file_name}</span></div><button className="outline-button" onClick={() => void openDocument(document)}>Ouvrir</button>{isAdmin && !document.file_path.startsWith('/documents/') && <button className="delete-button" onClick={() => void removeDocument(document)} aria-label={`Supprimer ${document.title}`}><Trash2 size={14} /></button>}</div>) : <p className="muted">Aucun document n’est encore publié.</p>}</div>{isAdmin && <label className="upload-panel"><span className="card-kicker">Administration · publier des fichiers</span><input type="file" multiple accept=".pdf,.xlsx,.xls" onChange={(event) => void uploadDocuments(event)} disabled={uploading} /><span className="muted">{uploading ? 'Téléversement en cours...' : 'Sélectionner les PDF et XLSX du dossier externe.'}</span>{message && <span className="form-error">{message}</span>}</label>}</section> }
-function useSessionIsAdmin() { const [isAdmin, setIsAdmin] = useState(false); useEffect(() => { supabase.auth.getUser().then(({ data }) => setIsAdmin(data.user?.email?.toLowerCase() === ADMIN_EMAIL)) }, []); return isAdmin }
-function Progress() { return <section className="content-grid"><div className="section-intro"><p className="eyebrow">Tableau de bord</p><h2>La constance laisse des traces.</h2></div><div className="progress-panel"><div className="progress-heading"><div><p className="card-kicker">Cycle global</p><h3>Semaine 01 / 16</h3></div><strong>6%</strong></div><div className="progress-bar"><span style={{ width: '6%' }} /></div><div className="metrics"><div><span>Langues</span><strong>0 / 7</strong></div><div><span>Sport</span><strong>0 séance</strong></div><div><span>Nutrition</span><strong>À définir</strong></div></div></div><div className="empty-state"><Activity size={22} /><p>Ton historique apparaîtra ici au fil des semaines.</p></div></section> }
-function Suggestions({ isAdmin, userId }: { isAdmin: boolean; userId: string }) { const [category, setCategory] = useState('fonctionnalite'); const [message, setMessage] = useState(''); const [feedback, setFeedback] = useState(''); const [suggestions, setSuggestions] = useState<Suggestion[]>([]); async function loadSuggestions() { if (!isAdmin) return; const { data } = await supabase.from('suggestions').select('id, category, message, status, created_at, profiles(email)').order('created_at', { ascending: false }); setSuggestions((data ?? []) as Suggestion[]) } useEffect(() => { void loadSuggestions() }, [isAdmin]); async function submit(event: React.FormEvent) { event.preventDefault(); const { error } = await supabase.from('suggestions').insert({ user_id: userId, category, message }); if (error) setFeedback('Impossible d’envoyer la suggestion.'); else { setMessage(''); setFeedback('Suggestion envoyée.'); } } async function updateStatus(id: string, status: 'treated' | 'deleted') { await supabase.from('suggestions').update({ status }).eq('id', id); void loadSuggestions() } return <section className="content-grid"><div className="section-intro"><p className="eyebrow">Boîte à idées</p><h2>Fais évoluer ton espace.</h2><p className="muted">Une idée de langue, de sport ou de fonctionnalité ? Elle arrive directement chez l’administrateur.</p></div><form className="suggestion-form" onSubmit={submit}><label>Catégorie<select value={category} onChange={(event) => setCategory(event.target.value)}><option value="fonctionnalite">Fonctionnalité</option><option value="langue">Nouvelle langue</option><option value="sport">Nouveau sport</option><option value="nourriture">Nourriture</option><option value="autre">Autre</option></select></label><label>Ta suggestion<textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Décris ton idée en quelques lignes..." rows={5} minLength={3} maxLength={2000} required /></label><button className="primary-button">Envoyer la suggestion</button>{feedback && <p className="muted">{feedback}</p>}</form>{isAdmin && <div className="admin-panel"><ShieldCheck size={20} /><div><p className="card-kicker">Administration</p><h3>Suggestions des membres</h3>{suggestions.length ? suggestions.map((suggestion) => <div className="suggestion-entry" key={suggestion.id}><strong>{suggestion.category}</strong><span>{suggestion.profiles?.[0]?.email ?? 'Membre'} · {suggestion.status}</span><p>{suggestion.message}</p><button className="outline-button" onClick={() => updateStatus(suggestion.id, 'treated')}>Marquer traitée</button><button className="delete-button" onClick={() => updateStatus(suggestion.id, 'deleted')} aria-label="Marquer comme supprimée"><Trash2 size={14} /></button></div>) : <p className="muted">Aucune suggestion reçue.</p>}</div></div>}</section> }
-
-void Planning
-void Progress
-void Suggestions
-void Resources
 
 export default App
-void LoginPage

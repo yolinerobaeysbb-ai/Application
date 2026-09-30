@@ -71,3 +71,20 @@ export function formatMinutes(minutes: number): string {
   const remainder = (minutes % 60).toString().padStart(2, '0')
   return `${hours}:${remainder}`
 }
+
+export function toLocalDateInput(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** Week number (1–totalWeeks) for a date relative to the member's program start. */
+export function programWeekForDate(programStart: Date, date = new Date(), totalWeeks = 16): number {
+  const start = new Date(programStart)
+  start.setHours(0, 0, 0, 0)
+  const current = new Date(date)
+  current.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((current.getTime() - start.getTime()) / 86_400_000)
+  return Math.min(totalWeeks, Math.max(1, Math.floor(diffDays / 7) + 1))
+}
