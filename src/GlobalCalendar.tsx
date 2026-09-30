@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Sparkles } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { expandOccurrences, findFreeSlots, formatMinutes, sameDay, type Occurrence, type ScheduleRow } from './lib/schedule'
+import { expandOccurrences, findFreeSlots, formatMinutes, sameDay, toLocalDateInput, type Occurrence, type ScheduleRow } from './lib/schedule'
 
 type View = 'day' | 'week' | 'month' | 'year'
 const categoryLabels: Record<ScheduleRow['category'], string> = { language: 'Langue', sport: 'Sport', food: 'Nourriture', fixed: 'Activité fixe' }
@@ -19,7 +19,7 @@ function startOfWeek(date: Date): Date {
 }
 
 function toDateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10)
+  return toLocalDateInput(date)
 }
 
 export default function GlobalCalendar({ userId }: { userId: string }) {

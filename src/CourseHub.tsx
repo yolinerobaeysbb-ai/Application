@@ -68,11 +68,21 @@ type Workout = {
 };
 type Props = {
   activity: Activity | null;
+  userId: string;
   onBack: () => void;
   onSelectCourse: (activity: Activity) => void;
 };
 
-export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
+function normalizeAnswer(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+export default function CourseHub({ activity, userId, onBack, onSelectCourse }: Props) {
   const [course, setCourse] = useState<Course | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -244,7 +254,7 @@ export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
     <section className="course-hub">
       <CourseDataView data={course?.data ?? {}} />
       <button className="back-link" onClick={onBack}>
-        <ArrowLeft size={16} /> Retour au planning
+        <ArrowLeft size={16} /> Retour aux cours
       </button>
       <div className="hub-hero">
         <span className={`hub-icon ${activity.category}`}>
@@ -270,6 +280,7 @@ export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
       ) : activity.category === "language" && course ? (
         <LanguageLesson
           course={course}
+          userId={userId}
           resources={resources}
           exercises={exercises}
           answers={answers}
@@ -280,6 +291,7 @@ export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
         />
       ) : activity.category === "sport" ? (
         <SportLesson
+          userId={userId}
           activity={activity}
           workout={workout}
           validated={validated.activity ?? false}
@@ -292,6 +304,7 @@ export default function CourseHub({ activity, onBack, onSelectCourse }: Props) {
         </article>
       ) : (
         <FoodLesson
+          userId={userId}
           activity={activity}
           recipe={recipe}
           validated={validated.activity ?? false}
@@ -661,6 +674,7 @@ function CourseCatalog({
 
 function LanguageLesson({
   course,
+  userId,
   resources,
   exercises,
   answers,
@@ -670,6 +684,7 @@ function LanguageLesson({
   onExerciseAdded,
 }: {
   course: Course;
+  userId: string;
   resources: Resource[];
   exercises: Exercise[];
   answers: Record<string, string>;
@@ -678,6 +693,64 @@ function LanguageLesson({
   setValidated: (value: Record<string, boolean>) => void;
   onExerciseAdded: (courseId: string) => void;
 }) {
+  const [production, setProduction] = useState("");
+  const [productionSaved, setProductionSaved] = useState(false);
+  const [results, setResults] = useState<Record<string, boolean | null>>({});
+  useEffect(() => {
+    if (!userId || !exercises.length) return;
+    void supabase
+      .from("exercise_attempts")
+      .select("exercise_id, answer, is_correct")
+      .eq("user_id", userId)
+      .in(
+        "exercise_id",
+        exercises.map((exercise) => exercise.id),
+      )
+      .then(({ data }) => {
+        const nextAnswers: Record<string, string> = {};
+        const nextValidated: Record<string, boolean> = {};
+        const nextResults: Record<string, boolean | null> = {};
+        for (const row of data ?? []) {
+          nextAnswers[row.exercise_id] = row.answer ?? "";
+          nextValidated[row.exercise_id] = true;
+          nextResults[row.exercise_id] = row.is_correct;
+        }
+        if (Object.keys(nextAnswers).length) setAnswers({ ...answers, ...nextAnswers });
+        if (Object.keys(nextValidated).length) setValidated({ ...validated, ...nextValidated });
+        setResults(nextResults);
+      });
+  }, [userId, exercises]);
+  async function correctExercise(exercise: Exercise) {
+    const given = answers[exercise.id] ?? "";
+    const expected = exercise.expected_answer || exercise.answer;
+    const isCorrect = expected
+      ? normalizeAnswer(given) === normalizeAnswer(expected)
+      : null;
+    setValidated({ ...validated, [exercise.id]: true });
+    setResults({ ...results, [exercise.id]: isCorrect });
+    await supabase.from("exercise_attempts").upsert(
+      {
+        user_id: userId,
+        exercise_id: exercise.id,
+        course_id: course.id,
+        answer: given,
+        is_correct: isCorrect,
+      },
+      { onConflict: "user_id,exercise_id" },
+    );
+  }
+  async function saveProduction() {
+    const message = production.trim();
+    if (!message) return;
+    await supabase.from("module_comments").insert({
+      user_id: userId,
+      target_type: "language_course",
+      target_id: course.id,
+      message: `Production : ${message}`,
+    });
+    setProduction("");
+    setProductionSaved(true);
+  }
   return (
     <div className="lesson-grid">
       <article className="lesson-card full-width">
@@ -782,9 +855,7 @@ function LanguageLesson({
             )}
             <button
               className="primary-button"
-              onClick={() =>
-                setValidated({ ...validated, [exercise.id]: true })
-              }
+              onClick={() => void correctExercise(exercise)}
             >
               {validated[exercise.id] ? (
                 <>
@@ -794,8 +865,13 @@ function LanguageLesson({
                 "Corriger"
               )}
             </button>
+            {validated[exercise.id] && results[exercise.id] !== undefined && results[exercise.id] !== null && (
+              <p className={`exercise-feedback ${results[exercise.id] ? "ok" : "ko"}`}>
+                {results[exercise.id] ? "Bonne réponse." : "À revoir — comparez avec la correction."}
+              </p>
+            )}
             {validated[exercise.id] && (
-              <div className="correction">
+              <div className={`correction ${results[exercise.id] === false ? "ko" : "ok"}`}>
                 <strong>Correction</strong>
                 <p>
                   {exercise.expected_answer ||
@@ -818,8 +894,16 @@ function LanguageLesson({
             Écrivez trois phrases avec le vocabulaire et la règle présentés
             ci-dessus, puis utilisez la lecture audio pour vous entraîner.
           </p>
-          <input placeholder="Votre production..." />
-          <button className="primary-button">Enregistrer ma réponse</button>
+          <textarea
+            rows={3}
+            value={production}
+            onChange={(event) => setProduction(event.target.value)}
+            placeholder="Votre production..."
+          />
+          <button className="primary-button" type="button" onClick={() => void saveProduction()}>
+            Enregistrer ma réponse
+          </button>
+          {productionSaved && <p className="exercise-feedback ok">Production enregistrée dans vos commentaires.</p>}
         </article>
       )}
       <MemberExerciseForm courseId={course.id} onAdded={onExerciseAdded} />
@@ -892,16 +976,35 @@ function MemberExerciseForm({
   );
 }
 function SportLesson({
+  userId,
   activity,
   workout,
   validated,
   setValidated,
 }: {
+  userId: string;
   activity: Activity;
   workout: Workout | null;
   validated: boolean;
   setValidated: (value: boolean) => void;
 }) {
+  const [message, setMessage] = useState("");
+  async function markComplete() {
+    const today = new Date();
+    const recordedOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const { error } = await supabase.from("sport_progress").insert({
+      user_id: userId,
+      recorded_on: recordedOn,
+      exercise_name: workout?.session_name ?? activity.title,
+      completed: true,
+      notes: "Séance validée depuis Plan & Plate.",
+    });
+    if (error) setMessage(error.message);
+    else {
+      setValidated(true);
+      setMessage("Séance enregistrée dans vos progrès.");
+    }
+  }
   return (
     <div className="lesson-grid">
       <article className="lesson-card full-width">
@@ -938,27 +1041,45 @@ function SportLesson({
         </p>
         <button
           className="primary-button"
-          onClick={() => setValidated(!validated)}
+          onClick={() => void markComplete()}
+          disabled={validated}
         >
           {validated
             ? "Séance marquée comme terminée"
             : "Marquer la séance terminée"}
         </button>
+        {message && <p className="exercise-feedback ok">{message}</p>}
       </article>
     </div>
   );
 }
 function FoodLesson({
+  userId,
   activity,
   recipe,
   validated,
   setValidated,
 }: {
+  userId: string;
   activity: Activity;
   recipe: Recipe | null;
   validated: boolean;
   setValidated: (value: boolean) => void;
 }) {
+  const [message, setMessage] = useState("");
+  async function markComplete() {
+    const today = new Date();
+    const recordedOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const existing = await supabase.from("nutrition_progress").select("id, meals_planned, meals_completed").eq("user_id", userId).eq("recorded_on", recordedOn).maybeSingle();
+    if (existing.data) {
+      const planned = Math.max(existing.data.meals_planned, existing.data.meals_completed + 1);
+      await supabase.from("nutrition_progress").update({ meals_planned: planned, meals_completed: existing.data.meals_completed + 1, preparation_completed: true }).eq("id", existing.data.id);
+    } else {
+      await supabase.from("nutrition_progress").insert({ user_id: userId, recorded_on: recordedOn, meals_planned: 1, meals_completed: 1, preparation_completed: true, notes: recipe?.name ?? activity.title });
+    }
+    setValidated(true);
+    setMessage("Repas enregistré dans vos progrès.");
+  }
   return (
     <div className="lesson-grid">
       <article className="lesson-card full-width">
@@ -990,10 +1111,12 @@ function FoodLesson({
         <h3>Repas préparé ?</h3>
         <button
           className="primary-button"
-          onClick={() => setValidated(!validated)}
+          onClick={() => void markComplete()}
+          disabled={validated}
         >
           {validated ? "Repas validé" : "Valider le repas"}
         </button>
+        {message && <p className="exercise-feedback ok">{message}</p>}
       </article>
     </div>
   );
