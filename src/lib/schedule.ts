@@ -53,8 +53,9 @@ export function findFreeSlots(occurrences: Occurrence[], date: Date, windowStart
     .map((occurrence) => {
       const start = timeToMinutes(occurrence.start_time) ?? windowStart
       const end = occurrence.end_time ? (timeToMinutes(occurrence.end_time) ?? start) : start + (occurrence.duration_minutes ?? 60)
-      return { start, end }
+      return { start: Math.max(start, windowStart), end: Math.min(end, windowEnd) }
     })
+    .filter((slot) => slot.end > slot.start)
     .sort((a, b) => a.start - b.start)
   const free: { start: number; end: number }[] = []
   let cursor = windowStart

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, BookOpen, CalendarRange, FolderOpen, Languages, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, UserRound, X } from 'lucide-react'
+import { Activity, BookOpen, FolderOpen, Languages, LayoutDashboard, LogOut, Menu, MessageSquarePlus, Moon, Settings, ShieldCheck, Sun, UserRound, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { programWeekForDate } from './lib/schedule'
 import PlanningV2 from './Planning'
@@ -10,11 +10,10 @@ import CourseHub from './CourseHub'
 import Supports from './Supports'
 import LanguageRecap from './LanguageRecap'
 import AdminDashboard from './AdminDashboard'
-import GlobalCalendar from './GlobalCalendar'
 import './App.css'
 
 const ADMIN_EMAIL = 'yoline.robaeysbb@gmail.com'
-const tabs = ['planning', 'calendar', 'courses', 'recap', 'resources', 'progress', 'suggestions', 'settings', 'admin'] as const
+const tabs = ['planning', 'courses', 'recap', 'resources', 'progress', 'suggestions', 'settings', 'admin'] as const
 type Tab = (typeof tabs)[number]
 type UiText = Record<string, string>
 type LoginProps = { email: string; password: string; setEmail: (value: string) => void; setPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReset: () => void; error: string; loading: boolean; uiText?: UiText }
@@ -137,7 +136,6 @@ function App() {
       <main className="page-content">
         {tab === 'planning' && <section className="welcome-row"><div><p className="eyebrow">Bonjour{greeting ? `, ${greeting}` : ''}</p><h1>{uiText.welcome_title || 'Votre espace pour progresser.'}</h1><p className="muted">{uiText.welcome_text || 'Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.'}</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>}
         {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={false} userId={session.user.id} onOpenActivity={openActivity} />}
-        {tab === 'calendar' && <GlobalCalendar userId={session.user.id} />}
         {tab === 'courses' && <CourseHub userId={session.user.id} activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} />}
         {tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}
         {tab === 'resources' && <Supports />}
@@ -154,7 +152,6 @@ function KeltiaMark({ large = false }: { large?: boolean }) { return <div classN
 function Sidebar({ activeTab, isAdmin, email, displayName, open, onNavigate, onClose }: { activeTab: Tab; isAdmin: boolean; email: string; displayName: string; open: boolean; onNavigate: (tab: Tab) => void; onClose: () => void }) {
   const items: { tab: Tab; label: string; caption: string; icon: React.ReactNode }[] = [
     { tab: 'planning', label: 'Tableau de bord', caption: 'Plannings', icon: <LayoutDashboard size={18} /> },
-    { tab: 'calendar', label: 'Planning global', caption: 'Calendrier combiné', icon: <CalendarRange size={18} /> },
     { tab: 'courses', label: 'Plan & Plate', caption: 'Cours et modules', icon: <BookOpen size={18} /> },
     { tab: 'recap', label: 'Récap', caption: 'Révisions par langue', icon: <Languages size={18} /> },
     { tab: 'progress', label: 'Progress', caption: 'Vos progrès', icon: <Activity size={18} /> },

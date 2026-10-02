@@ -32,3 +32,5 @@ Le flux Google Calendar (`calendar-feed`) et l’impersonation admin se déploie
 supabase functions deploy calendar-feed
 supabase functions deploy admin-start-impersonation
 ```
+
+Le tableau de bord regroupe les plannings de cours, sport, repas et activités fixes. Il permet de régler la date de début du programme, de repérer les créneaux libres et d’abonner Google Calendar au planning complet via le flux personnel.

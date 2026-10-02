@@ -114,7 +114,13 @@ main { padding-top: clamp(55px, 9vw, 105px); }.welcome-row { display: flex; alig
 .calendar-year-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 20px; }
 .calendar-feed-row { display: flex; gap: 8px; margin-top: 12px; }
 .calendar-feed-row input { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--keltia-line); border-radius: 9px; color: var(--keltia-ink); background: var(--keltia-bg); font-size: 12px; }
+.calendar-dashboard-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.calendar-dashboard-sync h3 { margin: 6px 0; color: var(--keltia-green); }
+.calendar-start-row select { padding: 10px; border: 1px solid var(--keltia-line); border-radius: 9px; color: var(--keltia-ink); background: var(--keltia-surface); }
+.current-week-indicator { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--keltia-muted); font-size: 13px; font-weight: 600; }
+.current-week-indicator svg { flex: none; }
 @media (max-width: 720px) { .calendar-month-grid { grid-template-columns: repeat(7, minmax(34px, 1fr)); } .calendar-year-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .calendar-dashboard-settings { grid-template-columns: 1fr; } }
 
 /* Progress: fatigue-aware suggestions and health questionnaire. */
 .health-quick-card { margin-bottom: 18px; }

@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' }
 
-type Row = { id: string; category: string; title: string; description: string; day_of_week: number; week_number: number; start_time: string | null; end_time: string | null; duration_minutes: number | null; recurrence: string }
+type Row = { id: string; category: string; title: string; description: string; day_of_week: number; week_number: number; start_time: string | null; end_time: string | null; duration_minutes: number | null; recurrence: string; meal_type: string | null }
 
 function weekDayToDate(start: Date, week: number, day: number): Date {
   const date = new Date(start)
@@ -29,23 +29,29 @@ Deno.serve(async (request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const client = createClient(supabaseUrl, serviceRoleKey)
 
-  const { data: tokenRow } = await client.from('calendar_feed_tokens').select('user_id').eq('token', token).maybeSingle()
+  const { data: tokenRow, error: tokenError } = await client.from('calendar_feed_tokens').select('user_id').eq('token', token).maybeSingle()
+  if (tokenError) return new Response('Unable to read calendar token', { status: 500, headers: corsHeaders })
   if (!tokenRow) return new Response('Invalid token', { status: 404, headers: corsHeaders })
 
-  const { data: profileRow } = await client.from('profiles').select('calendar_start_date').eq('id', tokenRow.user_id).maybeSingle()
-  const { data: settingRow } = await client.from('app_settings').select('setting_value').eq('setting_key', 'program_start_date').maybeSingle()
+  const { data: profileRow, error: profileError } = await client.from('profiles').select('calendar_start_date').eq('id', tokenRow.user_id).maybeSingle()
+  if (profileError) return new Response('Unable to read program start date', { status: 500, headers: corsHeaders })
+  const { data: settingRow, error: settingsError } = await client.from('app_settings').select('setting_value').eq('setting_key', 'program_start_date').maybeSingle()
+  if (settingsError) return new Response('Unable to read program settings', { status: 500, headers: corsHeaders })
   const resolvedStart = profileRow?.calendar_start_date ?? settingRow?.setting_value
   const start = resolvedStart ? new Date(resolvedStart) : new Date()
 
-  const { data: rows } = await client.from('weekly_schedule_items').select('id, category, title, description, day_of_week, week_number, start_time, end_time, duration_minutes, recurrence').neq('category', 'food').or(`user_id.is.null,user_id.eq.${tokenRow.user_id}`)
+  const { data: rows, error: scheduleError } = await client.from('weekly_schedule_items').select('id, category, title, description, day_of_week, week_number, start_time, end_time, duration_minutes, recurrence, meal_type').or(`user_id.is.null,user_id.eq.${tokenRow.user_id}`)
+  if (scheduleError) return new Response('Unable to read schedule', { status: 500, headers: corsHeaders })
 
   const events = ((rows ?? []) as Row[]).flatMap((row) => expand(row, start).map((date) => {
-    const [startHours, startMinutes] = (row.start_time ?? '09:00').split(':').map(Number)
+    const mealStarts: Record<string, string> = { breakfast: '08:00', lunch: '12:00', snack: '16:00', dinner: '19:00' }
+    const defaultStart = row.category === 'food' ? mealStarts[row.meal_type ?? ''] ?? '12:00' : '09:00'
+    const [startHours, startMinutes] = (row.start_time ?? defaultStart).split(':').map(Number)
     const startDateTime = new Date(date)
     startDateTime.setHours(startHours, startMinutes, 0, 0)
     const endDateTime = new Date(startDateTime)
     if (row.end_time) { const [endHours, endMinutes] = row.end_time.split(':').map(Number); endDateTime.setHours(endHours, endMinutes, 0, 0) }
-    else endDateTime.setMinutes(endDateTime.getMinutes() + (row.duration_minutes ?? 60))
+    else endDateTime.setMinutes(endDateTime.getMinutes() + (row.duration_minutes ?? (row.category === 'food' ? 30 : 60)))
     const toStamp = (value: Date) => value.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     return { startStamp: toStamp(startDateTime), endStamp: toStamp(endDateTime), row }
   }))
