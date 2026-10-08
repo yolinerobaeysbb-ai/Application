@@ -340,13 +340,10 @@ function CourseCatalog({
   const [recipes, setRecipes] = useState<
     { id: string; name: string; instructions: string; meal_type: string }[]
   >([]);
-  const [filter, setFilter] = useState<"language" | "sport" | "food" | "fixed">(
-    "language",
-  );
-  const [languageFilter, setLanguageFilter] = useState("Toutes");
-  const [sportFilter, setSportFilter] = useState("");
+  const [filter, setFilter] = useState<"language" | "sport" | "food" | "fixed" | null>(null);
+  const [option, setOption] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [sportOptions, setSportOptions] = useState<string[]>([]);
-  const [mealSlot, setMealSlot] = useState<string | null>(null);
   const [sportItems, setSportItems] = useState<
     {
       id: string;
@@ -365,9 +362,6 @@ function CourseCatalog({
       week_number: number;
     }[]
   >([]);
-  const sportPrograms = Array.from(
-    new Set(sportItems.map((item) => item.title)),
-  );
   const mealSlots = [
     { key: "breakfast", label: "Matin" },
     { key: "lunch", label: "Midi" },
@@ -460,99 +454,88 @@ function CourseCatalog({
       caption: "Vos rendez-vous récurrents",
     },
   ];
-  const languagesInCourses = [
-    "Toutes",
-    ...Array.from(new Set(courses.map((course) => course.language))),
-  ];
-  const visibleRecipes = recipes.filter(
-    (recipe) => !mealSlot || recipe.meal_type === mealSlot,
-  );
+  const norm = (value: string) => normalizeAnswer(value);
+  const q = norm(query);
+  const matches = (...fields: string[]) => !q || fields.some((field) => norm(field ?? "").includes(q));
+  const musculationChoices = Array.from(new Set(["Musculation", ...sportOptions]));
+  const options: { key: string; label: string }[] =
+    filter === "language"
+      ? Array.from(new Set(courses.map((course) => course.language))).map((key) => ({ key, label: key }))
+      : filter === "sport"
+        ? musculationChoices.map((key) => ({ key, label: key }))
+        : filter === "food"
+          ? mealSlots.map((slot) => ({ key: slot.key, label: slot.label }))
+          : Array.from(new Set(fixedItems.map((item) => item.title))).map((key) => ({ key, label: key }));
+  const currentCategory = filterButtons.find((button) => button.value === filter);
+  const optionLabel = options.find((item) => item.key === option)?.label ?? option;
+  const sportPrograms = Array.from(new Set(sportItems.map((item) => item.title)));
+  const goBack = () => {
+    setQuery("");
+    if (option) setOption(null);
+    else setFilter(null);
+  };
+  const categoryCard = (value: "language" | "sport" | "food" | "fixed") => {
+    setFilter(value);
+    setOption(null);
+    setQuery("");
+  };
   return (
     <section className="course-catalog">
       <div className="section-intro">
         <p className="eyebrow">Plan & Plate</p>
-        <h2>Votre bibliothèque de parcours.</h2>
+        <h2>{optionLabel ?? currentCategory?.label ?? "Votre bibliothèque de parcours."}</h2>
         <p className="muted">
-          Choisissez un domaine, puis une langue ou une discipline.
+          {!filter
+            ? "Choisissez un domaine pour commencer."
+            : !option
+              ? `Choisissez une option dans « ${currentCategory?.label} ».`
+              : "Recherchez un cours ou une notion, puis ouvrez le cours."}
         </p>
       </div>
-      <div className="admin-card-grid">
-        {filterButtons.map((button) => (
-          <button
-            className={`admin-card ${filter === button.value ? "active" : ""}`}
-            key={button.value}
-            onClick={() => {
-              setFilter(button.value);
-              setMealSlot(null);
-            }}
-          >
-            <strong>{button.label}</strong>
-            <span>{button.caption}</span>
-          </button>
-        ))}
-      </div>
-      {filter === "language" && (
-        <label className="catalog-select">
-          <span>Langue</span>
-          <select
-            value={languageFilter}
-            onChange={(event) => setLanguageFilter(event.target.value)}
-          >
-            {languagesInCourses.map((language) => (
-              <option key={language}>{language}</option>
-            ))}
-          </select>
-        </label>
+      {filter && (
+        <button className="back-link" type="button" onClick={goBack}>
+          <ArrowLeft size={16} /> Retour
+        </button>
       )}
-      {filter === "sport" && (
-        <label className="catalog-select">
-          <span>Discipline</span>
-          <select
-            value={sportFilter}
-            onChange={(event) => setSportFilter(event.target.value)}
-          >
-            <option value="">Toutes</option>
-            {sportOptions.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {filter === "food" && !mealSlot && (
-        <div className="admin-icon-grid">
-          {mealSlots.map((slot) => (
-            <button
-              className="admin-rect"
-              type="button"
-              key={slot.key}
-              onClick={() => setMealSlot(slot.key)}
-            >
-              <span>{slot.label}</span>
+      {!filter && (
+        <div className="admin-card-grid">
+          {filterButtons.map((button) => (
+            <button className="admin-card" key={button.value} onClick={() => categoryCard(button.value)}>
+              <strong>{button.label}</strong>
+              <span>{button.caption}</span>
             </button>
           ))}
         </div>
       )}
-      {filter === "food" && mealSlot && (
-        <button
-          className="secondary-button"
-          type="button"
-          onClick={() => setMealSlot(null)}
-        >
-          Retour
-        </button>
+      {filter && !option && (
+        options.length ? (
+          <div className="admin-icon-grid">
+            {options.map((item) => (
+              <button className="admin-rect" type="button" key={item.key} onClick={() => setOption(item.key)}>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Aucune option disponible pour le moment.</p>
+        )
       )}
-      <div className="catalog-grid">
-        {filter === "language" &&
-          (courses.filter(
-            (course) =>
-              languageFilter === "Toutes" || course.language === languageFilter,
-          ).length ? (
+      {filter && option && (
+        <label className="catalog-select">
+          <span>Rechercher un cours ou une notion</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Ex. : conjugaison, présent, salutations..."
+          />
+        </label>
+      )}
+      {filter && option && (
+        <div className="catalog-grid">
+          {filter === "language" &&
             courses
-              .filter(
-                (course) =>
-                  languageFilter === "Toutes" ||
-                  course.language === languageFilter,
-              )
+              .filter((course) => course.language === option && matches(course.title, course.summary))
               .map((course) => (
                 <button
                   className="catalog-course"
@@ -571,103 +554,84 @@ function CourseCatalog({
                   <span className="catalog-language">{course.language}</span>
                   <strong>{course.title}</strong>
                   <MathContent inline value={course.summary} className="catalog-description" />
-                  <small>
-                    {course.week_number
-                      ? `Semaine ${course.week_number}`
-                      : "Cours"}
-                  </small>
+                  <small>{course.week_number ? `Semaine ${course.week_number}` : "Cours"}</small>
                 </button>
-              ))
-          ) : (
-            <p className="muted">
-              Aucun cours pour cette langue. Exécutez les migrations ou ajoutez
-              le contenu.
-            </p>
-          ))}
-        {filter === "fixed" &&
-          (fixedItems.length ? (
-            fixedItems.map((item) => (
-              <button
-                className="catalog-course"
-                key={item.id}
-                onClick={() =>
-                  onSelectCourse({
-                    id: item.id,
-                    category: "fixed",
-                    title: item.title,
-                    description: item.description,
-                    duration_minutes: item.duration_minutes,
-                  })
-                }
-              >
-                <span className="catalog-language">
-                  Semaine {item.week_number}
-                </span>
-                <strong>{item.title}</strong>
-                <MathContent inline value={item.description} className="catalog-description" />
-                <small>Activité fixe</small>
-              </button>
-            ))
-          ) : (
-            <p className="muted">Aucune activité fixe pour le moment.</p>
-          ))}
-        {filter === "sport" &&
-          (sportFilter === "" || sportFilter === "Musculation" ? (
-            sportPrograms.map((program) => (
-              <button
-                className="catalog-course"
-                key={program}
-                onClick={() =>
-                  onSelectCourse({
-                    id: `program-${program}`,
-                    category: "sport",
-                    title: program,
-                    description:
-                      "Programme d’entraînement fourni dans Supports.",
-                    duration_minutes: 90,
-                  })
-                }
-              >
-                <span className="catalog-language">Musculation</span>
-                <strong>{program}</strong>
-                <small>Ouvrir le module sport</small>
-              </button>
-            ))
-          ) : (
-            <p className="muted">
-              Les modules {sportFilter.toLowerCase()} seront ajoutés dès que
-              leurs programmes seront fournis.
-            </p>
-          ))}
-        {filter === "food" &&
-          (visibleRecipes.length ? (
-            visibleRecipes.map((recipe) => (
-              <button
-                className="catalog-course"
-                key={recipe.id}
-                onClick={() =>
-                  onSelectCourse({
-                    id: recipe.id,
-                    category: "food",
-                    title: recipe.name,
-                    description: recipe.instructions,
-                    recipe_id: recipe.id,
-                    duration_minutes: null,
-                  })
-                }
-              >
-                <span className="catalog-language">Recette</span>
-                <strong>{recipe.name}</strong>
-                <MathContent inline value={recipe.instructions} className="catalog-description" />
-                <small>Voir ingrédients et préparation</small>
-              </button>
-            ))
-          ) : (
-            <p className="muted">
-              Exécutez la migration nutrition pour afficher les recettes.
-            </p>
-          ))}
-      </div>
+              ))}
+          {filter === "fixed" &&
+            fixedItems
+              .filter((item) => item.title === option && matches(item.title, item.description))
+              .map((item) => (
+                <button
+                  className="catalog-course"
+                  key={item.id}
+                  onClick={() =>
+                    onSelectCourse({
+                      id: item.id,
+                      category: "fixed",
+                      title: item.title,
+                      description: item.description,
+                      duration_minutes: item.duration_minutes,
+                    })
+                  }
+                >
+                  <span className="catalog-language">Semaine {item.week_number}</span>
+                  <strong>{item.title}</strong>
+                  <MathContent inline value={item.description} className="catalog-description" />
+                  <small>Activité fixe</small>
+                </button>
+              ))}
+          {filter === "sport" &&
+            option === "Musculation" &&
+            sportPrograms
+              .filter((program) => matches(program))
+              .map((program) => (
+                <button
+                  className="catalog-course"
+                  key={program}
+                  onClick={() =>
+                    onSelectCourse({
+                      id: `program-${program}`,
+                      category: "sport",
+                      title: program,
+                      description: "Programme d’entraînement fourni dans Supports.",
+                      duration_minutes: 90,
+                    })
+                  }
+                >
+                  <span className="catalog-language">Musculation</span>
+                  <strong>{program}</strong>
+                  <small>Ouvrir le module sport</small>
+                </button>
+              ))}
+          {filter === "sport" && option !== "Musculation" && (
+            <p className="muted">Les modules {option.toLowerCase()} seront ajoutés dès que leurs programmes seront fournis.</p>
+          )}
+          {filter === "food" &&
+            recipes
+              .filter((recipe) => recipe.meal_type === option && matches(recipe.name, recipe.instructions))
+              .map((recipe) => (
+                <button
+                  className="catalog-course"
+                  key={recipe.id}
+                  onClick={() =>
+                    onSelectCourse({
+                      id: recipe.id,
+                      category: "food",
+                      title: recipe.name,
+                      description: recipe.instructions,
+                      recipe_id: recipe.id,
+                      duration_minutes: null,
+                    })
+                  }
+                >
+                  <span className="catalog-language">Recette</span>
+                  <strong>{recipe.name}</strong>
+                  <MathContent inline value={recipe.instructions} className="catalog-description" />
+                  <small>Voir ingrédients et préparation</small>
+                </button>
+              ))}
+        </div>
+      )}
     </section>
   );
 }

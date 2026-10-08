@@ -27,6 +27,11 @@ function pathForTab(tab: Tab) {
   return tab === 'planning' ? '/' : `/${tab}`
 }
 
+function firstName(value: string) {
+  const first = value.trim().split(/[\s._-]+/)[0] ?? ''
+  return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : ''
+}
+
 function App() {
   const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']>(null)
   const [email, setEmail] = useState('')
@@ -43,6 +48,7 @@ function App() {
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [recapKey, setRecapKey] = useState(0)
 
   useEffect(() => {
     if (!isSupabaseConfigured) return
@@ -118,6 +124,7 @@ function App() {
   const navigate = (nextTab: Tab) => {
     setTab(nextTab)
     if (nextTab === 'courses') setSelectedActivity(null)
+    if (nextTab === 'recap') setRecapKey((value) => value + 1)
     setSidebarOpen(false)
     window.history.pushState({}, '', `${pathForTab(nextTab)}${window.location.search}`)
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -128,17 +135,17 @@ function App() {
     setSidebarOpen(false)
     window.history.pushState({}, '', `/courses${window.location.search}`)
   }
-  const greeting = displayName || session.user.email?.split('@')[0] || ''
+  const greeting = firstName(displayName || session.user.email?.split('@')[0] || '')
   return <div className={`keltia-app polar-theme ${darkMode ? 'theme-dark' : ''}`}>
     <Sidebar activeTab={tab} isAdmin={isAdmin} email={session.user.email ?? ''} displayName={displayName} open={sidebarOpen} onNavigate={navigate} onClose={() => setSidebarOpen(false)} />
     {sidebarOpen && <button className="sidebar-overlay" onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" />}
-    <div className="app-main"><header className="app-header"><button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu size={21} /></button><div><p className="header-kicker">Espace membre</p><strong>Keltia</strong></div><div className="header-actions">{isAdmin && <NotificationBell />}<button className="avatar-button" onClick={() => navigate('settings')} aria-label="Ouvrir les paramètres"><UserRound size={18} /></button></div></header>
+    <div className="app-main"><header className="app-header"><button className="menu-button" onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu"><Menu size={21} /></button><div><p className="header-kicker">Espace membre</p><strong>Keltia</strong></div><div className="header-actions">{isAdmin && <NotificationBell />}<button className="avatar-button" onClick={() => void handleLogout()} aria-label="Se déconnecter" title="Se déconnecter"><LogOut size={18} /></button><button className="avatar-button" onClick={() => navigate('settings')} aria-label="Ouvrir les paramètres"><UserRound size={18} /></button></div></header>
       <main className="page-content">
         {tab === 'planning' && <section className="welcome-row"><div><p className="eyebrow">Bonjour{greeting ? `, ${greeting}` : ''}</p><h1>{uiText.welcome_title || 'Votre espace pour progresser.'}</h1><p className="muted">{uiText.welcome_text || 'Un parcours clair pour apprendre, bouger et prendre soin de votre équilibre.'}</p></div><img className="dashboard-mascot" src="/keltia-mascot.jpg" alt="Mascotte Keltia" /></section>}
         {tab === 'planning' && <PlanningV2 week={week} setWeek={setWeek} isAdmin={false} userId={session.user.id} onOpenActivity={openActivity} />}
         {tab === 'courses' && <CourseHub userId={session.user.id} activity={selectedActivity} onSelectCourse={openActivity} onBack={() => navigate('courses')} />}
-        {tab === 'recap' && <LanguageRecap selectedLanguage={selectedActivity?.language ?? undefined} />}
-        {tab === 'resources' && <Supports />}
+        {tab === 'recap' && <LanguageRecap key={recapKey} />}
+        {tab === 'resources' && <Supports isAdmin={isAdmin} userId={session.user.id} />}
         {tab === 'progress' && <ProgressDashboard userId={session.user.id} />}
         {tab === 'suggestions' && <SuggestionsV2 isAdmin={false} userId={session.user.id} />}
         {tab === 'settings' && <SettingsPanel userId={session.user.id} email={session.user.email ?? ''} isAdmin={isAdmin} displayName={displayName} onDisplayNameChange={setDisplayName} darkMode={darkMode} onDarkModeChange={(value) => void persistTheme(value)} onLogout={() => void handleLogout()} />}

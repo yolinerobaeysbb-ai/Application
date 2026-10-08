@@ -2,10 +2,9 @@ import MathField, { MathContent } from './MathField'
 import './math.css'
 import { useEffect, useState } from "react";
 import {
+  ArrowLeft,
   BookOpen,
-  ChevronDown,
   FileText,
-  Languages,
   PencilLine,
   Table2,
   Trash2,
@@ -71,7 +70,8 @@ const emptyForm = (position: number): SectionForm => ({
 export default function LanguageRecap({ selectedLanguage }: Props) {
   const [language, setLanguage] = useState(selectedLanguage ?? languages[0]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [activeType, setActiveType] = useState<SectionType>("vocabulary");
+  const [picked, setPicked] = useState(Boolean(selectedLanguage));
+  const [activeType, setActiveType] = useState<SectionType | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -246,41 +246,66 @@ export default function LanguageRecap({ selectedLanguage }: Props) {
     }
   };
 
-  return (
-    <section className="recap-page">
-      <div className="section-intro">
-        <p className="eyebrow">Bibliothèque linguistique</p>
-        <h2>Récapitulatif par langue.</h2>
-        <p className="muted">
-          Vocabulaire, alphabet, règles et tableaux utiles pour réviser les 16
-          semaines.
-        </p>
-      </div>
-      <div className="recap-toolbar">
-        <label>
-          <Languages size={16} />
-          <span>Langue</span>
-          <select
-            value={language}
-            onChange={(event) => setLanguage(event.target.value)}
-          >
-            {languages.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-          <ChevronDown size={15} />
-        </label>
-        <nav className="recap-tabs">
-          {(Object.keys(labels) as SectionType[]).map((type) => (
+  if (!picked)
+    return (
+      <section className="recap-page">
+        <div className="section-intro">
+          <p className="eyebrow">Bibliothèque linguistique</p>
+          <h2>Choisissez une langue.</h2>
+          <p className="muted">Alphabet, vocabulaire, règles et conjugaisons par langue.</p>
+        </div>
+        <div className="admin-icon-grid">
+          {languages.map((item) => (
             <button
-              className={activeType === type ? "active" : ""}
-              key={type}
-              onClick={() => setActiveType(type)}
+              className="admin-rect"
+              type="button"
+              key={item}
+              onClick={() => {
+                setLanguage(item);
+                setActiveType(null);
+                setPicked(true);
+              }}
             >
-              {labels[type]}
+              <span>{item}</span>
             </button>
           ))}
-        </nav>
+        </div>
+      </section>
+    );
+
+  const typesWithContent = (Object.keys(labels) as SectionType[]).filter((type) =>
+    sections.some((section) => section.section_type === type),
+  );
+  const availableTypes = isAdmin || !typesWithContent.length ? (Object.keys(labels) as SectionType[]) : typesWithContent;
+
+  if (!activeType)
+    return (
+      <section className="recap-page">
+        <button className="back-link" type="button" onClick={() => setPicked(false)}>
+          <ArrowLeft size={16} /> Langues
+        </button>
+        <div className="section-intro">
+          <p className="eyebrow">{language}</p>
+          <h2>Que souhaitez-vous réviser ?</h2>
+        </div>
+        <div className="admin-icon-grid">
+          {availableTypes.map((type) => (
+            <button className="admin-rect" type="button" key={type} onClick={() => setActiveType(type)}>
+              <span>{labels[type]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+
+  return (
+    <section className="recap-page">
+      <button className="back-link" type="button" onClick={() => { setActiveType(null); setShowAdminPanel(false) }}>
+        <ArrowLeft size={16} /> {language}
+      </button>
+      <div className="section-intro">
+        <p className="eyebrow">{language}</p>
+        <h2>{labels[activeType]}</h2>
       </div>
       <div className="recap-grid">
         {visible.length ? (
